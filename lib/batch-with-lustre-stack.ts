@@ -170,7 +170,7 @@ export class BatchWithLustreStack extends cdk.Stack {
       service: 'fsx',
       action: 'describeFileSystems',
       parameters: {
-        FileSystemIds: sfn.JsonPath.stringAt('$.fileSystem.FileSystem.FileSystemId')
+        'FileSystemIds.$': "States.Array($.fileSystem.FileSystem.FileSystemId)"
       },
       iamResources: ['*'],
       resultPath: '$.status'
