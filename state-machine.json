@@ -1,0 +1,175 @@
+{
+  "Comment": "AWS Batch with FSx for Lustre workflow",
+  "StartAt": "Create S3 Bucket",
+  "States": {
+    "Create S3 Bucket": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:s3:createBucket",
+      "Parameters": {
+        "Bucket": "my-fsx-lustre-bucket",
+        "CreateBucketConfiguration": {
+          "LocationConstraint": "us-east-1"
+        }
+      },
+      "ResultPath": "$.s3Result",
+      "Next": "Create FSx for Lustre"
+    },
+    "Create FSx for Lustre": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:fsx:createFileSystem",
+      "Parameters": {
+        "FileSystemType": "LUSTRE",
+        "StorageCapacity": 1200,
+        "SubnetIds": ["${SubnetId}"],
+        "SecurityGroupIds": ["${SecurityGroupId}"],
+        "LustreConfiguration": {
+          "ImportPath": "s3://my-fsx-lustre-bucket",
+          "DeploymentType": "SCRATCH_2",
+          "ExportPath": "s3://my-fsx-lustre-bucket/export",
+          "ImportedFileChunkSize": 1024
+        }
+      },
+      "ResultPath": "$.fsxResult",
+      "Next": "Wait for FSx Creation"
+    },
+    "Wait for FSx Creation": {
+      "Type": "Wait",
+      "Seconds": 300,
+      "Next": "Create Launch Template"
+    },
+    "Create Launch Template": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:createLaunchTemplate",
+      "Parameters": {
+        "LaunchTemplateName": "FSxLustreLaunchTemplate",
+        "LaunchTemplateData": {
+          "UserData": "${UserData}",
+          "InstanceType": "c5.xlarge",
+          "ImageId": "ami-0123456789abcdef0"
+        }
+      },
+      "ResultPath": "$.launchTemplateResult",
+      "Next": "Create Compute Environment"
+    },
+    "Create Compute Environment": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:batch:createComputeEnvironment",
+      "Parameters": {
+        "computeEnvironmentName": "FSxLustreCompute",
+        "type": "MANAGED",
+        "state": "ENABLED",
+        "computeResources": {
+          "type": "EC2",
+          "minvCpus": 0,
+          "maxvCpus": 16,
+          "desiredvCpus": 0,
+          "instanceTypes": ["optimal"],
+          "subnets": ["${SubnetId}"],
+          "securityGroupIds": ["${SecurityGroupId}"],
+          "launchTemplate": {
+            "launchTemplateId.$": "$.launchTemplateResult.LaunchTemplate.LaunchTemplateId"
+          }
+        },
+        "serviceRole": "${BatchServiceRole}"
+      },
+      "ResultPath": "$.computeEnvironmentResult",
+      "Next": "Create Job Queue"
+    },
+    "Create Job Queue": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:batch:createJobQueue",
+      "Parameters": {
+        "jobQueueName": "FSxLustreJobQueue",
+        "state": "ENABLED",
+        "priority": 1,
+        "computeEnvironmentOrder": [{
+          "order": 1,
+          "computeEnvironment.$": "$.computeEnvironmentResult.computeEnvironmentArn"
+        }]
+      },
+      "ResultPath": "$.jobQueueResult",
+      "Next": "Register Job Definition"
+    },
+    "Register Job Definition": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:batch:registerJobDefinition",
+      "Parameters": {
+        "jobDefinitionName": "Fsx-sample",
+        "type": "container",
+        "containerProperties": {
+          "image": "busybox",
+          "vcpus": 1,
+          "memory": 1024,
+          "volumes": [{
+            "host": {
+              "sourcePath": "/scratch"
+            },
+            "name": "Scratch"
+          }],
+          "mountPoints": [{
+            "containerPath": "/scratch",
+            "sourceVolume": "Scratch"
+          }]
+        }
+      },
+      "ResultPath": "$.jobDefinitionResult",
+      "Next": "Submit Job"
+    },
+    "Submit Job": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::batch:submitJob.sync",
+      "Parameters": {
+        "JobName": "FSxLustreJob",
+        "JobQueue.$": "$.jobQueueResult.jobQueueArn",
+        "JobDefinition.$": "$.jobDefinitionResult.jobDefinitionArn"
+      },
+      "ResultPath": "$.jobResult",
+      "Next": "Deregister Job Definition"
+    },
+    "Deregister Job Definition": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:batch:deregisterJobDefinition",
+      "Parameters": {
+        "jobDefinition.$": "$.jobDefinitionResult.jobDefinitionArn"
+      },
+      "Next": "Delete Job Queue"
+    },
+    "Delete Job Queue": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:batch:deleteJobQueue",
+      "Parameters": {
+        "jobQueue.$": "$.jobQueueResult.jobQueueArn"
+      },
+      "Next": "Wait for Job Queue Deletion"
+    },
+    "Wait for Job Queue Deletion": {
+      "Type": "Wait",
+      "Seconds": 60,
+      "Next": "Delete Compute Environment"
+    },
+    "Delete Compute Environment": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:batch:deleteComputeEnvironment",
+      "Parameters": {
+        "computeEnvironment.$": "$.computeEnvironmentResult.computeEnvironmentArn"
+      },
+      "Next": "Delete Launch Template"
+    },
+    "Delete Launch Template": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:deleteLaunchTemplate",
+      "Parameters": {
+        "LaunchTemplateId.$": "$.launchTemplateResult.LaunchTemplate.LaunchTemplateId"
+      },
+      "Next": "Delete FSx for Lustre"
+    },
+    "Delete FSx for Lustre": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:fsx:deleteFileSystem",
+      "Parameters": {
+        "FileSystemId.$": "$.fsxResult.FileSystem.FileSystemId"
+      },
+      "End": true
+    }
+  }
+}
