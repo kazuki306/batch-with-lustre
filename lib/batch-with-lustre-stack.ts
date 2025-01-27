@@ -69,11 +69,19 @@ export class BatchWithLustreStack extends cdk.Stack {
       roles: [batchInstanceRole.roleName]
     });
 
+    // AWS Batchのサービスリンクロールを参照
+    const batchServiceLinkedRole = iam.Role.fromRoleName(
+      this,
+      'BatchServiceLinkedRole',
+      'AWSServiceRoleForBatch'
+    );
+
     // Batchのコンピューティング環境
     const computeEnvironment = new batch.CfnComputeEnvironment(this, 'ComputeEnvironment', {
       type: 'MANAGED',
       computeResources: {
-        type: 'EC2',
+        type: 'SPOT',
+        allocationStrategy: 'SPOT_PRICE_CAPACITY_OPTIMIZED',
         maxvCpus: 4,
         minvCpus: 0,
         desiredvCpus: 0,
@@ -82,7 +90,7 @@ export class BatchWithLustreStack extends cdk.Stack {
         securityGroupIds: [lustreSecurityGroup.securityGroupId],
         instanceRole: batchInstanceProfile.attrArn,
       },
-      serviceRole: batchServiceRole.roleArn,
+      serviceRole: batchServiceLinkedRole.roleArn,
       state: 'ENABLED'
     });
 
@@ -136,6 +144,24 @@ export class BatchWithLustreStack extends cdk.Stack {
                 bucket.bucketArn,
                 `${bucket.bucketArn}/*`
               ]
+            }),
+            // EC2起動テンプレートの権限
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'ec2:CreateLaunchTemplate',
+                'ec2:CreateLaunchTemplateVersion',
+                'ec2:ModifyLaunchTemplate'
+              ],
+              resources: ['*']
+            }),
+            // Batchコンピューティング環境の更新権限
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'batch:UpdateComputeEnvironment'
+              ],
+              resources: ['*']
             })
           ]
         })
@@ -163,7 +189,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     });
 
     const waitForFileSystem = new sfn.Wait(this, 'WaitForFileSystem', {
-      time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
+      time: sfn.WaitTime.duration(cdk.Duration.minutes(0.5))
     });
 
     const checkFileSystemStatus = new tasks.CallAwsService(this, 'CheckFileSystemStatus', {
@@ -177,14 +203,54 @@ export class BatchWithLustreStack extends cdk.Stack {
     });
 
     const isFileSystemAvailable = new sfn.Choice(this, 'IsFileSystemAvailable');
-    const fileSystemAvailable = new sfn.Succeed(this, 'FileSystemAvailable');
+    // 起動テンプレートを作成するタスク
+    const createLaunchTemplate = new tasks.CallAwsService(this, 'CreateLaunchTemplate', {
+      service: 'ec2',
+      action: 'createLaunchTemplate',
+      parameters: {
+        LaunchTemplateName: sfn.JsonPath.format('lustre-mount-{}', sfn.JsonPath.stringAt('$.fileSystem.FileSystem.FileSystemId')),
+        LaunchTemplateData: {
+          UserData: sfn.JsonPath.format(
+            '{}',
+            sfn.JsonPath.stringAt("States.Base64Encode(States.Format('Content-Type: multipart/mixed; boundary=\"==MYBOUNDARY==\"\nMIME-Version: 1.0\n\n--==MYBOUNDARY==\nContent-Type: text/cloud-boothook; charset=\"us-ascii\"\n\nfile_system_id={}\nregion={}\nfsx_directory=/scratch\nfsx_mount_name={}\namazon-linux-extras install -y lustre2.10\nmkdir -p $fsx_directory\nmount -t lustre -o noatime,flock $file_system_id.fsx.$region.amazonaws.com@tcp:/$fsx_mount_name $fsx_directory\n\n--==MYBOUNDARY==--', $.fileSystem.FileSystem.FileSystemId, '" + this.region + "', $.fileSystem.FileSystem.LustreConfiguration.MountName))")
+          )
+        }
+      },
+      iamResources: ['*'],
+      resultPath: '$.launchTemplate'
+    });
+
+    // コンピューティング環境を更新するタスク
+    const updateComputeEnvironment = new tasks.CallAwsService(this, 'UpdateComputeEnvironment', {
+      service: 'batch',
+      action: 'updateComputeEnvironment',
+      parameters: {
+        ComputeEnvironment: computeEnvironment.ref,
+        ServiceRole: batchServiceLinkedRole.roleArn,
+        ComputeResources: {
+          AllocationStrategy: 'SPOT_PRICE_CAPACITY_OPTIMIZED',
+          LaunchTemplate: {
+            LaunchTemplateId: sfn.JsonPath.stringAt('$.launchTemplate.LaunchTemplate.LaunchTemplateId'),
+            Version: '$Latest'
+          }
+        }
+      },
+      iamResources: ['*'],
+      resultPath: '$.updateResult'
+    });
+
+    const setupComplete = new sfn.Succeed(this, 'SetupComplete');
 
     const definition = createLustreFileSystem
       .next(waitForFileSystem)
       .next(checkFileSystemStatus)
       .next(
         isFileSystemAvailable
-          .when(sfn.Condition.stringEquals('$.status.FileSystems[0].Lifecycle', 'AVAILABLE'), fileSystemAvailable)
+          .when(sfn.Condition.stringEquals('$.status.FileSystems[0].Lifecycle', 'AVAILABLE'),
+            createLaunchTemplate
+              .next(updateComputeEnvironment)
+              .next(setupComplete)
+          )
           .otherwise(waitForFileSystem)
       );
 
