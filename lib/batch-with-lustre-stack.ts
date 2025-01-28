@@ -6,6 +6,8 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import { Construct } from 'constructs';
+import { version } from 'os';
+import { FileSystemTypeVersion } from 'aws-cdk-lib/aws-fsx';
 
 export class BatchWithLustreStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -51,12 +53,12 @@ export class BatchWithLustreStack extends cdk.Stack {
     );
 
     // Batch用のIAMロール
-    const batchServiceRole = new iam.Role(this, 'BatchServiceRole', {
-      assumedBy: new iam.ServicePrincipal('batch.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSBatchServiceRole')
-      ]
-    });
+    // const batchServiceRole = new iam.Role(this, 'BatchServiceRole', {
+    //   assumedBy: new iam.ServicePrincipal('batch.amazonaws.com'),
+    //   managedPolicies: [
+    //     iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSBatchServiceRole')
+    //   ]
+    // });
 
     const batchInstanceRole = new iam.Role(this, 'BatchInstanceRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
@@ -73,7 +75,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     const batchServiceLinkedRole = iam.Role.fromRoleName(
       this,
       'BatchServiceLinkedRole',
-      'AWSServiceRoleForBatch'
+      `aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch`
     );
 
     // Batchのコンピューティング環境
@@ -91,7 +93,8 @@ export class BatchWithLustreStack extends cdk.Stack {
         instanceRole: batchInstanceProfile.attrArn,
       },
       serviceRole: batchServiceLinkedRole.roleArn,
-      state: 'ENABLED'
+      state: 'ENABLED',
+      replaceComputeEnvironment: true,
     });
 
     // ジョブキュー
@@ -117,7 +120,9 @@ export class BatchWithLustreStack extends cdk.Stack {
               effect: iam.Effect.ALLOW,
               actions: [
                 'fsx:CreateFileSystem',
-                'fsx:DescribeFileSystems'
+                'fsx:DescribeFileSystems',
+                'fsx:CreateDataRepositoryAssociation',
+                'fsx:DescribeDataRepositoryAssociations'
               ],
               resources: ['*']
             }),
@@ -162,6 +167,14 @@ export class BatchWithLustreStack extends cdk.Stack {
                 'batch:UpdateComputeEnvironment'
               ],
               resources: ['*']
+            }),
+            // サービスリンクロールをBatchに渡す権限
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'iam:PassRole'
+              ],
+              resources: [`arn:aws:iam::${this.account}:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch`]
             })
           ]
         })
@@ -174,14 +187,12 @@ export class BatchWithLustreStack extends cdk.Stack {
       action: 'createFileSystem',
       parameters: {
         FileSystemType: 'LUSTRE',
+        FileSystemTypeVersion: '2.15',
         StorageCapacity: 1200,
         SubnetIds: [vpc.privateSubnets[0].subnetId],
         SecurityGroupIds: [lustreSecurityGroup.securityGroupId],
         LustreConfiguration: {
-          DeploymentType: 'SCRATCH_2',
-          ImportPath: bucket.s3UrlForObject(),
-          ExportPath: bucket.s3UrlForObject('export'),
-          ImportedFileChunkSize: 1024
+          DeploymentType: 'SCRATCH_2'
         }
       },
       iamResources: ['*'],
@@ -204,6 +215,29 @@ export class BatchWithLustreStack extends cdk.Stack {
 
     const isFileSystemAvailable = new sfn.Choice(this, 'IsFileSystemAvailable');
     // 起動テンプレートを作成するタスク
+    // データリポジトリ連携の作成
+    const createDataRepositoryAssociation = new tasks.CallAwsService(this, 'CreateDataRepositoryAssociation', {
+      service: 'fsx',
+      action: 'createDataRepositoryAssociation',
+      parameters: {
+        'FileSystemId.$': '$.fileSystem.FileSystem.FileSystemId',
+        'FileSystemPath': '/scratch',
+        'DataRepositoryPath': bucket.s3UrlForObject('/'),
+        'BatchImportMetaDataOnCreate': true,
+        'ImportedFileChunkSize': 1024,
+        'S3': {
+          'AutoImportPolicy': {
+            'Events': ['NEW', 'CHANGED', 'DELETED']
+          },
+          'AutoExportPolicy': {
+            'Events': ['NEW', 'CHANGED', 'DELETED']
+          }
+        }
+      },
+      iamResources: ['*'],
+      resultPath: '$.dataRepositoryAssociation'
+    });
+
     const createLaunchTemplate = new tasks.CallAwsService(this, 'CreateLaunchTemplate', {
       service: 'ec2',
       action: 'createLaunchTemplate',
@@ -212,7 +246,7 @@ export class BatchWithLustreStack extends cdk.Stack {
         LaunchTemplateData: {
           UserData: sfn.JsonPath.format(
             '{}',
-            sfn.JsonPath.stringAt("States.Base64Encode(States.Format('Content-Type: multipart/mixed; boundary=\"==MYBOUNDARY==\"\nMIME-Version: 1.0\n\n--==MYBOUNDARY==\nContent-Type: text/cloud-boothook; charset=\"us-ascii\"\n\nfile_system_id={}\nregion={}\nfsx_directory=/scratch\nfsx_mount_name={}\namazon-linux-extras install -y lustre2.10\nmkdir -p $fsx_directory\nmount -t lustre -o noatime,flock $file_system_id.fsx.$region.amazonaws.com@tcp:/$fsx_mount_name $fsx_directory\n\n--==MYBOUNDARY==--', $.fileSystem.FileSystem.FileSystemId, '" + this.region + "', $.fileSystem.FileSystem.LustreConfiguration.MountName))")
+            sfn.JsonPath.stringAt("States.Base64Encode(States.Format('Content-Type: multipart/mixed; boundary=\"==MYBOUNDARY==\"\nMIME-Version: 1.0\n\n--==MYBOUNDARY==\nContent-Type: text/cloud-boothook; charset=\"us-ascii\"\n\nfile_system_id={}\nregion={}\nfsx_directory=/scratch\nfsx_mount_name={}\namazon-linux-extras install -y lustre\nmkdir -p $fsx_directory\nmount -t lustre -o noatime,flock $file_system_id.fsx.$region.amazonaws.com@tcp:/$fsx_mount_name $fsx_directory\n\n--==MYBOUNDARY==--', $.fileSystem.FileSystem.FileSystemId, '" + this.region + "', $.fileSystem.FileSystem.LustreConfiguration.MountName))")
           )
         }
       },
@@ -247,7 +281,8 @@ export class BatchWithLustreStack extends cdk.Stack {
       .next(
         isFileSystemAvailable
           .when(sfn.Condition.stringEquals('$.status.FileSystems[0].Lifecycle', 'AVAILABLE'),
-            createLaunchTemplate
+            createDataRepositoryAssociation
+              .next(createLaunchTemplate)
               .next(updateComputeEnvironment)
               .next(setupComplete)
           )
@@ -256,7 +291,7 @@ export class BatchWithLustreStack extends cdk.Stack {
 
     new sfn.StateMachine(this, 'CreateLustreStateMachine', {
       definition,
-      timeout: cdk.Duration.hours(1),
+      // timeout: cdk.Duration.hours(1),
       role: stepFunctionsRole
     });
   }
