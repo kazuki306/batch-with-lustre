@@ -5,6 +5,7 @@ import * as batch from 'aws-cdk-lib/aws-batch';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
 import { Construct } from 'constructs';
 import { version } from 'os';
 import { FileSystemTypeVersion } from 'aws-cdk-lib/aws-fsx';
@@ -37,6 +38,19 @@ export class BatchWithLustreStack extends cdk.Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // 開発環境用
       autoDeleteObjects: true, // 開発環境用
+    });
+
+    // ECRリポジトリの作成
+    const ecrRepository = new ecr.Repository(this, 'BatchJobRepository', {
+      repositoryName: 'batch-with-lustre-job',
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // 開発環境用
+      autoDeleteImages: true, // 開発環境用
+      lifecycleRules: [
+        {
+          maxImageCount: 3, // 最新の3つのイメージのみを保持
+          description: 'Keep only the last 3 images'
+        }
+      ]
     });
 
     // FSx for Lustre用のセキュリティグループ
