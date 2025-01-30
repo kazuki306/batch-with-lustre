@@ -210,12 +210,20 @@ export class BatchWithLustreStack extends cdk.Stack {
         'FileSystemIds.$': "States.Array($.fileSystem.FileSystem.FileSystemId)"
       },
       iamResources: ['*'],
-      resultPath: '$.status'
+      resultPath: '$.fileSystemStatus'
     });
 
-    const isFileSystemAvailable = new sfn.Choice(this, 'IsFileSystemAvailable');
-    // 起動テンプレートを作成するタスク
-    // データリポジトリ連携の作成
+    const checkDataRepositoryAssociation = new tasks.CallAwsService(this, 'CheckDataRepositoryAssociation', {
+      service: 'fsx',
+      action: 'describeDataRepositoryAssociations',
+      parameters: {
+        'AssociationIds.$': "States.Array($.dataRepositoryAssociation.Association.AssociationId)"
+      },
+      iamResources: ['*'],
+      resultPath: '$.dataRepositoryStatus'
+    });
+
+    const isFileSystemAndAssociationAvailable = new sfn.Choice(this, 'IsFileSystemAndAssociationAvailable');
     const createDataRepositoryAssociation = new tasks.CallAwsService(this, 'CreateDataRepositoryAssociation', {
       service: 'fsx',
       action: 'createDataRepositoryAssociation',
@@ -276,13 +284,17 @@ export class BatchWithLustreStack extends cdk.Stack {
     const setupComplete = new sfn.Succeed(this, 'SetupComplete');
 
     const definition = createLustreFileSystem
+      .next(createDataRepositoryAssociation)
       .next(waitForFileSystem)
       .next(checkFileSystemStatus)
+      .next(checkDataRepositoryAssociation)
       .next(
-        isFileSystemAvailable
-          .when(sfn.Condition.stringEquals('$.status.FileSystems[0].Lifecycle', 'AVAILABLE'),
-            createDataRepositoryAssociation
-              .next(createLaunchTemplate)
+        isFileSystemAndAssociationAvailable
+          .when(sfn.Condition.and(
+            sfn.Condition.stringEquals('$.fileSystemStatus.FileSystems[0].Lifecycle', 'AVAILABLE'),
+            sfn.Condition.stringEquals('$.dataRepositoryStatus.Associations[0].Lifecycle', 'AVAILABLE')
+          ),
+            createLaunchTemplate
               .next(updateComputeEnvironment)
               .next(setupComplete)
           )
