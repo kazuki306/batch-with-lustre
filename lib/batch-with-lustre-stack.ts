@@ -222,6 +222,15 @@ export class BatchWithLustreStack extends cdk.Stack {
                 'batch:DeregisterJobDefinition'
               ],
               resources: ['*']
+            }),
+            // Batchジョブの送信と確認の権限
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'batch:SubmitJob',
+                'batch:DescribeJobs'
+              ],
+              resources: ['*']
             })
           ]
         })
@@ -333,7 +342,7 @@ export class BatchWithLustreStack extends cdk.Stack {
       service: 'batch',
       action: 'registerJobDefinition',
       parameters: {
-        JobDefinitionName: sfn.JsonPath.format('lustre-job-{}', sfn.JsonPath.stringAt('$.fileSystem.FileSystem.FileSystemId')),
+        JobDefinitionName: sfn.JsonPath.format('lustre-job-definition-{}', sfn.JsonPath.stringAt('$.fileSystem.FileSystem.FileSystemId')),
         Type: 'container',
         ContainerProperties: {
           'Image.$': '$.containerImage',
@@ -356,6 +365,44 @@ export class BatchWithLustreStack extends cdk.Stack {
       resultPath: '$.jobDefinition'
     });
 
+    // ジョブ送信タスク
+    const submitJob = new tasks.CallAwsService(this, 'SubmitJob', {
+      service: 'batch',
+      action: 'submitJob',
+      parameters: {
+        JobName: sfn.JsonPath.format('lustre-job-{}', sfn.JsonPath.stringAt('$.fileSystem.FileSystem.FileSystemId')),
+        JobQueue: jobQueue.ref,
+        JobDefinition: sfn.JsonPath.format('lustre-job-definition-{}', sfn.JsonPath.stringAt('$.fileSystem.FileSystem.FileSystemId'))
+      },
+      iamResources: ['*'],
+      resultPath: '$.submittedJob'
+    });
+
+    // ジョブステータスの確認を待機
+    const waitForJobCompletion = new sfn.Wait(this, 'WaitForJobCompletion', {
+      time: sfn.WaitTime.duration(cdk.Duration.seconds(30))
+    });
+
+    // ジョブステータスの確認タスク
+    const checkJobStatus = new tasks.CallAwsService(this, 'CheckJobStatus', {
+      service: 'batch',
+      action: 'describeJobs',
+      parameters: {
+        'Jobs.$': "States.Array($.submittedJob.jobId)"
+      },
+      iamResources: ['*'],
+      resultPath: '$.jobStatus'
+    });
+
+    // ジョブの完了確認
+    const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
+      .when(sfn.Condition.stringEquals('$.jobStatus.jobs[0].status', 'SUCCEEDED'), new sfn.Succeed(this, 'JobSucceeded'))
+      .when(sfn.Condition.stringEquals('$.jobStatus.jobs[0].status', 'FAILED'), new sfn.Fail(this, 'JobFailed', {
+        cause: 'Batch Job Failed',
+        error: 'BatchJobError'
+      }))
+      .otherwise(waitForJobCompletion);
+
     const setupComplete = new sfn.Succeed(this, 'SetupComplete');
 
     const definition = createLustreFileSystem
@@ -372,7 +419,10 @@ export class BatchWithLustreStack extends cdk.Stack {
             createLaunchTemplate
               .next(updateComputeEnvironment)
               .next(createJobDefinition)
-              .next(setupComplete)
+              .next(submitJob)
+              .next(waitForJobCompletion)
+              .next(checkJobStatus)
+              .next(isJobComplete)
           )
           .otherwise(waitForFileSystem)
       );
