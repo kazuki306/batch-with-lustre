@@ -388,7 +388,7 @@ export class BatchWithLustreStack extends cdk.Stack {
       service: 'batch',
       action: 'describeJobs',
       parameters: {
-        'Jobs.$': "States.Array($.submittedJob.jobId)"
+        'Jobs.$': "States.Array($.submittedJob.JobId)"
       },
       iamResources: ['*'],
       resultPath: '$.jobStatus'
@@ -396,8 +396,8 @@ export class BatchWithLustreStack extends cdk.Stack {
 
     // ジョブの完了確認
     const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
-      .when(sfn.Condition.stringEquals('$.jobStatus.jobs[0].status', 'SUCCEEDED'), new sfn.Succeed(this, 'JobSucceeded'))
-      .when(sfn.Condition.stringEquals('$.jobStatus.jobs[0].status', 'FAILED'), new sfn.Fail(this, 'JobFailed', {
+      .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), new sfn.Succeed(this, 'JobSucceeded'))
+      .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), new sfn.Fail(this, 'JobFailed', {
         cause: 'Batch Job Failed',
         error: 'BatchJobError'
       }))
