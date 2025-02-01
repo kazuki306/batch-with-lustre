@@ -149,6 +149,35 @@ export class BatchWithLustreStack extends cdk.Stack {
       ]
     });
 
+    // CloudWatchメトリクスをチェックするLambda関数
+    const checkMetricsFunction = new nodejs.NodejsFunction(this, 'CheckMetricsFunction', {
+      entry: 'lib/lambda/check-metrics/index.ts',
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_18_X,
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: {
+        REGION: this.region,
+      },
+      bundling: {
+        minify: true,
+        sourceMap: true,
+      },
+    });
+
+    // CloudWatchメトリクスの読み取り権限を追加
+    checkMetricsFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'cloudwatch:GetMetricData',
+          'cloudwatch:GetMetricStatistics',
+          'cloudwatch:ListMetrics',
+        ],
+        resources: ['*'],
+      })
+    );
+
     // Step Functions用のIAMロール
     const stepFunctionsRole = new iam.Role(this, 'CreateLustreStateMachineRole', {
       assumedBy: new iam.ServicePrincipal('states.amazonaws.com'),
@@ -162,7 +191,8 @@ export class BatchWithLustreStack extends cdk.Stack {
                 'fsx:CreateFileSystem',
                 'fsx:DescribeFileSystems',
                 'fsx:CreateDataRepositoryAssociation',
-                'fsx:DescribeDataRepositoryAssociations'
+                'fsx:DescribeDataRepositoryAssociations',
+                'fsx:DeleteFileSystem'
               ],
               resources: ['*']
             }),
@@ -233,6 +263,14 @@ export class BatchWithLustreStack extends cdk.Stack {
                 'batch:DescribeJobs'
               ],
               resources: ['*']
+            }),
+            // Lambda関数の実行権限
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'lambda:InvokeFunction'
+              ],
+              resources: [checkMetricsFunction.functionArn]
             })
           ]
         })
@@ -396,38 +434,38 @@ export class BatchWithLustreStack extends cdk.Stack {
       resultPath: '$.jobStatus'
     });
 
-    // CloudWatchメトリクスをチェックするLambda関数
-    const checkMetricsFunction = new nodejs.NodejsFunction(this, 'CheckMetricsFunction', {
-      entry: 'lib/lambda/check-metrics/index.ts',
-      handler: 'handler',
-      runtime: lambda.Runtime.NODEJS_18_X,
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 256,
-      environment: {
-        REGION: this.region,
-      },
-      bundling: {
-        minify: true,
-        sourceMap: true,
-      },
+    // メトリクスをチェックするLambdaタスク
+    const checkMetricsTask = new tasks.LambdaInvoke(this, 'CheckMetrics', {
+      lambdaFunction: checkMetricsFunction,
+      payload: sfn.TaskInput.fromObject({
+        'fileSystemId.$': '$.fileSystem.FileSystem.FileSystemId'
+      }),
+      resultPath: '$.metricsCheck'
     });
 
-    // CloudWatchメトリクスの読み取り権限を追加
-    checkMetricsFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          'cloudwatch:GetMetricData',
-          'cloudwatch:GetMetricStatistics',
-          'cloudwatch:ListMetrics',
-        ],
-        resources: ['*'],
-      })
-    );
+    // FSxを削除するタスク
+    const deleteFSx = new tasks.CallAwsService(this, 'DeleteFSx', {
+      service: 'fsx',
+      action: 'deleteFileSystem',
+      parameters: {
+        'FileSystemId.$': '$.fileSystem.FileSystem.FileSystemId'
+      },
+      iamResources: ['*']
+    });
+
+    // メトリクスチェック後の待機タスク
+    const waitForNextCheck = new sfn.Wait(this, 'WaitForNextCheck', {
+      time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
+    });
+
+    // メトリクス値による分岐
+    const shouldDeleteFSx = new sfn.Choice(this, 'ShouldDeleteFSx')
+      .when(sfn.Condition.booleanEquals('$.metricsCheck.Payload.shouldDeleteFSx', true), deleteFSx)
+      .otherwise(waitForNextCheck);
 
     // ジョブの完了確認
     const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
-      .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), new sfn.Succeed(this, 'JobSucceeded'))
+      .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), checkMetricsTask)
       .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), new sfn.Fail(this, 'JobFailed', {
         cause: 'Batch Job Failed',
         error: 'BatchJobError'
@@ -457,6 +495,11 @@ export class BatchWithLustreStack extends cdk.Stack {
           )
           .otherwise(waitForFileSystem)
       );
+
+    // メトリクスチェックのフローを追加
+    checkMetricsTask.next(shouldDeleteFSx);
+    deleteFSx.next(setupComplete);
+    waitForNextCheck.next(checkMetricsTask);
 
     new sfn.StateMachine(this, 'CreateLustreStateMachine', {
       definition,
