@@ -6,6 +6,8 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
 import { version } from 'os';
 import { FileSystemTypeVersion } from 'aws-cdk-lib/aws-fsx';
@@ -393,6 +395,35 @@ export class BatchWithLustreStack extends cdk.Stack {
       iamResources: ['*'],
       resultPath: '$.jobStatus'
     });
+
+    // CloudWatchメトリクスをチェックするLambda関数
+    const checkMetricsFunction = new nodejs.NodejsFunction(this, 'CheckMetricsFunction', {
+      entry: 'lib/lambda/check-metrics/index.ts',
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_18_X,
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: {
+        REGION: this.region,
+      },
+      bundling: {
+        minify: true,
+        sourceMap: true,
+      },
+    });
+
+    // CloudWatchメトリクスの読み取り権限を追加
+    checkMetricsFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'cloudwatch:GetMetricData',
+          'cloudwatch:GetMetricStatistics',
+          'cloudwatch:ListMetrics',
+        ],
+        resources: ['*'],
+      })
+    );
 
     // ジョブの完了確認
     const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
