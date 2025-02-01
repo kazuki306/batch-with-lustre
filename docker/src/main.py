@@ -65,7 +65,7 @@ def main():
     
     try:
         # 環境変数から設定を読み込む
-        scratch_path = os.environ.get('SCRATCH_PATH', '/scratch')
+        scratch_path = os.environ.get('SCRATCH_PATH', '/scratch/scratch')
         
         logger.info(f"Scratchパス: {scratch_path}")
         
