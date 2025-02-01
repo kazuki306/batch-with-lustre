@@ -41,16 +41,40 @@ export class BatchWithLustreStack extends cdk.Stack {
     });
 
     // ECRリポジトリの作成
+    // ECRリポジトリの作成
     const ecrRepository = new ecr.Repository(this, 'BatchJobRepository', {
       repositoryName: 'batch-with-lustre-job',
       removalPolicy: cdk.RemovalPolicy.DESTROY, // 開発環境用
-      autoDeleteImages: true, // 開発環境用
+      emptyOnDelete: true, // 開発環境用
       lifecycleRules: [
         {
           maxImageCount: 3, // 最新の3つのイメージのみを保持
           description: 'Keep only the last 3 images'
         }
       ]
+    });
+
+    // ECRリポジトリのカスタムリソースに必要な権限を追加
+    const customResourceRole = new iam.Role(this, 'CustomECRAutoDeleteImagesRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole')
+      ],
+      inlinePolicies: {
+        'ECRPermissions': new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'ecr:DescribeRepositories',
+                'ecr:ListImages',
+                'ecr:BatchDeleteImage'
+              ],
+              resources: [ecrRepository.repositoryArn]
+            })
+          ]
+        })
+      }
     });
 
     // FSx for Lustre用のセキュリティグループ
@@ -189,6 +213,15 @@ export class BatchWithLustreStack extends cdk.Stack {
                 'iam:PassRole'
               ],
               resources: [`arn:aws:iam::${this.account}:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch`]
+            }),
+            // Batchジョブ定義の作成権限
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'batch:RegisterJobDefinition',
+                'batch:DeregisterJobDefinition'
+              ],
+              resources: ['*']
             })
           ]
         })
@@ -295,6 +328,34 @@ export class BatchWithLustreStack extends cdk.Stack {
       resultPath: '$.updateResult'
     });
 
+    // ジョブ定義の作成
+    const createJobDefinition = new tasks.CallAwsService(this, 'CreateJobDefinition', {
+      service: 'batch',
+      action: 'registerJobDefinition',
+      parameters: {
+        JobDefinitionName: sfn.JsonPath.format('lustre-job-{}', sfn.JsonPath.stringAt('$.fileSystem.FileSystem.FileSystemId')),
+        Type: 'container',
+        ContainerProperties: {
+          'Image.$': '$.containerImage',
+          Vcpus: 1,
+          Memory: 2048,
+          Volumes: [{
+            Host: {
+              SourcePath: '/scratch'
+            },
+            Name: 'scratch'
+          }],
+          MountPoints: [{
+            ContainerPath: '/scratch',
+            SourceVolume: 'scratch',
+            ReadOnly: false
+          }]
+        }
+      },
+      iamResources: ['*'],
+      resultPath: '$.jobDefinition'
+    });
+
     const setupComplete = new sfn.Succeed(this, 'SetupComplete');
 
     const definition = createLustreFileSystem
@@ -310,6 +371,7 @@ export class BatchWithLustreStack extends cdk.Stack {
           ),
             createLaunchTemplate
               .next(updateComputeEnvironment)
+              .next(createJobDefinition)
               .next(setupComplete)
           )
           .otherwise(waitForFileSystem)
