@@ -94,7 +94,6 @@ def main():
             logger.info(f"file: {file['name']} (サイズ: {size_mb:.2f}MB, 更新: {file['modified']})")
         
         logger.info("バッチジョブが正常に完了しました")
-        print("test done.")
         
     except Exception as e:
         logger.error(f"エラーが発生しました: {str(e)}")
