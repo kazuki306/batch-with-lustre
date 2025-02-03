@@ -61,7 +61,7 @@ def list_directory_contents(path: str):
         raise
 
 def main():
-    logger.info("バッチジョブを開始します!!!")
+    logger.info("バッチジョブを開始します")
     
     try:
         # 環境変数から設定を読み込む
@@ -93,7 +93,7 @@ def main():
             size_mb = file["size"] / (1024 * 1024)  # バイトからMBに変換
             logger.info(f"file: {file['name']} (サイズ: {size_mb:.2f}MB, 更新: {file['modified']})")
         
-        logger.info("バッチジョブが正常に完了しました")
+        logger.info("バッチジョブが完了しました")
         
     except Exception as e:
         logger.error(f"エラーが発生しました: {str(e)}")
