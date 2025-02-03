@@ -153,8 +153,8 @@ export class BatchWithLustreStack extends cdk.Stack {
     const checkMetricsFunction = new nodejs.NodejsFunction(this, 'CheckMetricsFunction', {
       entry: 'lib/lambda/check-metrics/index.ts',
       handler: 'handler',
-      runtime: lambda.Runtime.NODEJS_18_X,
-      timeout: cdk.Duration.seconds(30),
+      runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: cdk.Duration.seconds(60),
       memorySize: 256,
       environment: {
         REGION: this.region,
