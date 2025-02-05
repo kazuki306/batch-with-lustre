@@ -1,20 +1,42 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
 import { BatchWithLustreStack } from '../lib/batch-with-lustre-stack';
+import { BatchWithoutLustreStack } from '../lib/batch-without-lustre-stack';
+import { BatchWithNewLustreStack } from '../lib/batch-with-new-lustre-stack';
 
 const app = new cdk.App();
+
+// 環境設定
+const env = {
+  account: process.env.CDK_DEFAULT_ACCOUNT,
+  region: 'ap-northeast-1' // Tokyoリージョンを指定
+};
+
+// タグの設定
+const tags = {
+  Project: 'BatchWithLustre',
+  Environment: 'Development'
+};
+
+// 共通のスタックプロパティ
+const commonProps = {
+  env,
+  tags
+};
+
 new BatchWithLustreStack(app, 'BatchWithLustreStack', {
-  /* If you don't specify 'env', this stack will be environment-agnostic.
-   * Account/Region-dependent features and context lookups will not work,
-   * but a single synthesized template can be deployed anywhere. */
-
-  /* Uncomment the next line to specialize this stack for the AWS Account
-   * and Region that are implied by the current CLI configuration. */
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
-
-  /* Uncomment the next line if you know exactly what Account and Region you
-   * want to deploy the stack to. */
-  // env: { account: '123456789012', region: 'us-east-1' },
-
-  /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
+  ...commonProps,
+  description: 'Batch with Lustre file system stack'
 });
+
+new BatchWithoutLustreStack(app, 'BatchWithoutLustreStack', {
+  ...commonProps,
+  description: 'Batch without Lustre file system stack'
+});
+
+new BatchWithNewLustreStack(app, 'BatchWithNewLustreStack', {
+  ...commonProps,
+  description: 'Batch with new Lustre file system and S3 integration stack'
+});
+
+app.synth();

@@ -5,23 +5,35 @@ from datetime import datetime
 import json
 import random
 import time
+import tarfile
+import tempfile
 
 # ロギングの設定
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def generate_large_file(file_path: str, size_gb: int):
-    """指定されたサイズの大容量ファイルを生成する"""
+def generate_large_tgz(file_path: str, size_gb: int):
+    """指定されたサイズの大容量tgzファイルを生成する"""
     # 1GBのブロックサイズ
     block_size = 1024 * 1024 * 1024
     # 1GBのデータブロック（ゼロで初期化）
     data_block = b'\0' * block_size
     
     try:
-        with open(file_path, 'wb') as f:
+        # 一時ファイルを作成
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            temp_path = temp_file.name
             # 指定されたGBサイズまでブロックを書き込む
             for _ in range(size_gb):
-                f.write(data_block)
+                temp_file.write(data_block)
+            temp_file.flush()
+        
+        # 一時ファイルをtgzに圧縮
+        with tarfile.open(file_path, 'w:gz') as tar:
+            tar.add(temp_path, arcname=os.path.basename(file_path).replace('.tgz', '.dat'))
+        
+        # 一時ファイルを削除
+        os.unlink(temp_path)
         
         # ファイルサイズを確認
         actual_size = os.path.getsize(file_path)
@@ -29,10 +41,12 @@ def generate_large_file(file_path: str, size_gb: int):
         return True
     except Exception as e:
         logger.error(f"ファイル生成中にエラーが発生: {str(e)}")
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
         return False
 
 def main():
-    logger.info("大容量ファイル生成バッチジョブを開始します")
+    logger.info("大容量tgzファイル生成バッチジョブを開始します")
     start_time = time.time()
     
     try:
@@ -44,13 +58,12 @@ def main():
         os.makedirs(scratch_path, exist_ok=True)
         
         # 24回の処理を実行
-        for i in range(2):
+        for i in range(24):
             process_start_time = time.time()
             
             # ランダムなファイルサイズを決定（100-300GB）
-            # file_size_gb = random.randint(100, 300)
-            file_size_gb = random.randint(10, 30)
-            file_name = f"test_file_{i+1:02d}_{file_size_gb}GB.dat"
+            file_size_gb = random.randint(100, 300)
+            file_name = f"test_file_{i+1:02d}_{file_size_gb}GB.tgz"
             file_path = os.path.join(scratch_path, file_name)
             
             logger.info(f"\n=== 処理 {i+1}/24 開始 ===")
@@ -58,7 +71,7 @@ def main():
             logger.info(f"目標サイズ: {file_size_gb}GB")
             
             # ファイルを生成
-            if not generate_large_file(file_path, file_size_gb):
+            if not generate_large_tgz(file_path, file_size_gb):
                 raise Exception(f"ファイル生成に失敗しました: {file_name}")
             
             process_end_time = time.time()

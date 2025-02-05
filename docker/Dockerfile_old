@@ -1,0 +1,26 @@
+FROM --platform=linux/amd64 amazonlinux:2023
+
+# Install Python 3.10 and other dependencies
+# RUN dnf install -y \
+#     python3.10 \
+#     python3.10-pip \
+#     curl \
+#     && dnf clean all
+
+RUN dnf install -y \
+    curl \
+    && dnf clean all
+
+# Install Lustre client
+RUN dnf install -y lustre-client
+
+WORKDIR /app
+
+# Update pip and install requirements
+COPY requirements.txt .
+# RUN python3.10 -m pip install --no-cache-dir --upgrade pip && \
+    # python3.10 -m pip install --no-cache-dir -r requirements.txt
+
+COPY src/ .
+
+CMD ["python3.9", "lustre_striping.py"]
