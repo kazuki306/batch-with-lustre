@@ -24,19 +24,30 @@ const commonProps = {
   tags
 };
 
-new BatchWithLustreStack(app, 'BatchWithLustreStack', {
+// cdk.jsonから環境タイプのパラメータを取得
+const type = app.node.tryGetContext('type');
+const context = app.node.tryGetContext(type);
+
+if (!context) {
+  throw new Error(`Invalid type: ${type}. Please specify a valid type using -c type=<autoExport|taskExport>`);
+}
+
+// 環境タイプに応じたBatchWithLustreStackを作成
+new BatchWithLustreStack(app, `BatchWithLustre${context.envName}Stack`, {
   ...commonProps,
-  description: 'Batch with Lustre file system stack'
+  description: `Batch with Lustre file system stack (${context.envName})`,
+  autoExport: context.autoExport
 });
 
-new BatchWithoutLustreStack(app, 'BatchWithoutLustreStack', {
-  ...commonProps,
-  description: 'Batch without Lustre file system stack'
-});
+// その他の既存のスタック
+// new BatchWithoutLustreStack(app, 'BatchWithoutLustreStack', {
+//   ...commonProps,
+//   description: 'Batch without Lustre file system stack'
+// });
 
-new BatchWithNewLustreStack(app, 'BatchWithNewLustreStack', {
-  ...commonProps,
-  description: 'Batch with new Lustre file system and S3 integration stack'
-});
+// new BatchWithNewLustreStack(app, 'BatchWithNewLustreStack', {
+//   ...commonProps,
+//   description: 'Batch with new Lustre file system and S3 integration stack'
+// });
 
 app.synth();

@@ -12,7 +12,7 @@ interface CheckMetricsResult {
 export const handler = async (event: CheckMetricsEvent): Promise<CheckMetricsResult> => {
   const client = new CloudWatchClient({ region: process.env.REGION });
   const now = new Date();
-  const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
+  const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
 
   try {
     // AgeOfOldestQueuedMessageメトリクスを取得
@@ -40,7 +40,7 @@ export const handler = async (event: CheckMetricsEvent): Promise<CheckMetricsRes
           }
         }
       ],
-      StartTime: tenMinutesAgo,
+      StartTime: thirtyMinutesAgo,
       EndTime: now
     });
 

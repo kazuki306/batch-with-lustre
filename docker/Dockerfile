@@ -4,25 +4,21 @@ FROM --platform=linux/amd64 ubuntu:20.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Tokyo
 
-# Install basic dependencies
-RUN apt-get update && apt-get install -y \
+# Update package lists
+RUN apt-get update
+
+# Install essential packages first
+RUN apt-get install -y --no-install-recommends \
+    ca-certificates \
     curl \
     wget \
-    gnupg2 \
+    gnupg2
+
+# Install additional packages
+RUN apt-get install -y --no-install-recommends \
     software-properties-common \
-    && rm -rf /var/lib/apt/lists/*
-
-# Add deadsnakes PPA for Python 3.10
-RUN add-apt-repository ppa:deadsnakes/ppa
-
-# Install Python 3.10 and pip
-RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3.10-distutils \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install pip for Python 3.10
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
+    bc \
+    sudo
 
 # Install Lustre client
 RUN wget -O - https://fsx-lustre-client-repo-public-keys.s3.amazonaws.com/fsx-ubuntu-public-key.asc | gpg --dearmor | tee /usr/share/keyrings/fsx-ubuntu-public-key.gpg >/dev/null \
@@ -30,16 +26,19 @@ RUN wget -O - https://fsx-lustre-client-repo-public-keys.s3.amazonaws.com/fsx-ub
     && apt-get update \
     && apt-get install -y \
     linux-aws \
-    lustre-client-modules-aws \
-    && rm -rf /var/lib/apt/lists/*
+    lustre-client-modules-aws
+
+# Clean up
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Update pip and install requirements
-COPY requirements.txt .
-RUN python3.10 -m pip install --no-cache-dir --upgrade pip && \
-    python3.10 -m pip install --no-cache-dir -r requirements.txt
+# Copy shell script
+COPY scripts/write_test.sh .
 
-COPY src/ .
+# Make script executable
+RUN chmod +x write_test.sh
 
-CMD ["python3.10", "lustre_striping.py"]
+# Set default command (デフォルトで1回の書き込み、20GBのファイルサイズ)
+CMD ["./write_test.sh", "3", "20"]

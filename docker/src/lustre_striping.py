@@ -32,7 +32,7 @@ def get_ost_usage():
     """各OSTの使用状況を取得"""
     return execute_command("lfs df -h")
 
-def write_test_file(path, size_gb=200, stripe_type="no_stripe"):
+def write_test_file(path, size_gb=20, stripe_type="no_stripe"):
     """テストファイル書き込み"""
     file_path = os.path.join(path, f"test_{size_gb}gb_{stripe_type}")
     

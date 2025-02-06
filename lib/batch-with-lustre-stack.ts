@@ -12,9 +12,15 @@ import { Construct } from 'constructs';
 import { version } from 'os';
 import { FileSystemTypeVersion } from 'aws-cdk-lib/aws-fsx';
 
+interface BatchWithLustreStackProps extends cdk.StackProps {
+  autoExport?: boolean;
+}
+
 export class BatchWithLustreStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props?: BatchWithLustreStackProps) {
     super(scope, id, props);
+
+    const autoExport = props?.autoExport ?? true;
 
     // VPCの作成
     const vpc = new ec2.Vpc(this, 'BatchVPC', {
@@ -42,18 +48,22 @@ export class BatchWithLustreStack extends cdk.Stack {
       autoDeleteObjects: true, // 開発環境用
     });
 
-    // ECRリポジトリの作成
+    // typeパラメータを取得
+    const app = scope.node.root as cdk.App;
+    const type = app.node.tryGetContext('type');
+    const context = app.node.tryGetContext(type);
+
     // ECRリポジトリの作成
     const ecrRepository = new ecr.Repository(this, 'BatchJobRepository', {
-      repositoryName: 'batch-with-lustre-job',
+      repositoryName: `batch-with-lustre-job-${context.envName.toLowerCase()}`,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // 開発環境用
       emptyOnDelete: true, // 開発環境用
-      lifecycleRules: [
-        {
-          maxImageCount: 3, // 最新の3つのイメージのみを保持
-          description: 'Keep only the last 3 images'
-        }
-      ]
+      // lifecycleRules: [
+      //   {
+      //     maxImageCount: 3, // 最新の3つのイメージのみを保持
+      //     description: 'Keep only the last 3 images'
+      //   }
+      // ]
     });
 
     // ECRリポジトリのカスタムリソースに必要な権限を追加
@@ -91,14 +101,6 @@ export class BatchWithLustreStack extends cdk.Stack {
       ec2.Port.tcp(988),
       'Allow Lustre traffic from VPC'
     );
-
-    // Batch用のIAMロール
-    // const batchServiceRole = new iam.Role(this, 'BatchServiceRole', {
-    //   assumedBy: new iam.ServicePrincipal('batch.amazonaws.com'),
-    //   managedPolicies: [
-    //     iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSBatchServiceRole')
-    //   ]
-    // });
 
     const batchInstanceRole = new iam.Role(this, 'BatchInstanceRole', {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
@@ -192,7 +194,9 @@ export class BatchWithLustreStack extends cdk.Stack {
                 'fsx:DescribeFileSystems',
                 'fsx:CreateDataRepositoryAssociation',
                 'fsx:DescribeDataRepositoryAssociations',
-                'fsx:DeleteFileSystem'
+                'fsx:DeleteFileSystem',
+                'fsx:CreateDataRepositoryTask',
+                'fsx:DescribeDataRepositoryTasks'
               ],
               resources: ['*']
             }),
@@ -333,9 +337,11 @@ export class BatchWithLustreStack extends cdk.Stack {
           'AutoImportPolicy': {
             'Events': ['NEW', 'CHANGED', 'DELETED']
           },
-          'AutoExportPolicy': {
-            'Events': ['NEW', 'CHANGED', 'DELETED']
-          }
+          ...(autoExport ? {
+            'AutoExportPolicy': {
+              'Events': ['NEW', 'CHANGED', 'DELETED']
+            }
+          } : {})
         }
       },
       iamResources: ['*'],
@@ -458,52 +464,119 @@ export class BatchWithLustreStack extends cdk.Stack {
       time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
     });
 
-    // メトリクス値による分岐
-    const shouldDeleteFSx = new sfn.Choice(this, 'ShouldDeleteFSx')
-      .when(sfn.Condition.booleanEquals('$.metricsCheck.Payload.shouldDeleteFSx', true), deleteFSx)
-      .otherwise(waitForNextCheck);
+    // データリポジトリタスクの作成
+    const createDataRepositoryTask = new tasks.CallAwsService(this, 'CreateDataRepositoryTask', {
+      service: 'fsx',
+      action: 'createDataRepositoryTask',
+      parameters: {
+        'FileSystemId.$': '$.fileSystem.FileSystem.FileSystemId',
+        'Type': 'EXPORT_TO_REPOSITORY',
+        'Paths': ['/scratch'],
+        'Report': {
+          'Enabled': true
+        }
+      },
+      iamResources: ['*'],
+      resultPath: '$.dataRepositoryTask'
+    });
 
-    // ジョブの完了確認
-    const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
-      .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), checkMetricsTask)
-      .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), new sfn.Fail(this, 'JobFailed', {
-        cause: 'Batch Job Failed',
-        error: 'BatchJobError'
-      }))
-      .otherwise(waitForJobCompletion);
+    // データリポジトリタスクのステータスチェック
+    const checkDataRepositoryTasks = new tasks.CallAwsService(this, 'CheckDataRepositoryTasks', {
+      service: 'fsx',
+      action: 'describeDataRepositoryTasks',
+      parameters: {
+        'FileSystemId.$': '$.fileSystem.FileSystem.FileSystemId',
+        'Filters': [
+          {
+            'Name': 'type',
+            'Values': ['EXPORT_TO_REPOSITORY']
+          }
+        ]
+      },
+      iamResources: ['*'],
+      resultPath: '$.dataRepositoryTasks'
+    });
 
+    // データリポジトリタスクの完了を待機
+    const waitForDataRepositoryTask = new sfn.Wait(this, 'WaitForDataRepositoryTask', {
+      time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
+    });
+
+    // 終了ステートの定義
     const setupComplete = new sfn.Succeed(this, 'SetupComplete');
+    const jobFailed = new sfn.Fail(this, 'JobFailed', {
+      cause: 'Batch Job Failed',
+      error: 'BatchJobError'
+    });
 
-    const definition = createLustreFileSystem
+    // ファイルシステムの可用性チェックフロー
+    isFileSystemAndAssociationAvailable
+      .when(sfn.Condition.and(
+        sfn.Condition.stringEquals('$.fileSystemStatus.FileSystems[0].Lifecycle', 'AVAILABLE'),
+        sfn.Condition.stringEquals('$.dataRepositoryStatus.Associations[0].Lifecycle', 'AVAILABLE')
+      ),
+        createLaunchTemplate
+          .next(updateComputeEnvironment)
+          .next(createJobDefinition)
+          .next(submitJob)
+          .next(waitForJobCompletion)
+          .next(checkJobStatus)
+      )
+      .otherwise(waitForFileSystem);
+
+    // ステート遷移はチェーンで定義済み
+
+    // autoExportの値に基づいて異なるフローを構築
+    let definition;
+    if (autoExport) {
+      // メトリクス値による分岐
+      const shouldDeleteFSx = new sfn.Choice(this, 'ShouldDeleteFSx')
+        .when(sfn.Condition.booleanEquals('$.metricsCheck.Payload.shouldDeleteFSx', true), deleteFSx)
+        .otherwise(waitForNextCheck);
+
+      checkMetricsTask.next(shouldDeleteFSx);
+      waitForNextCheck.next(checkMetricsTask);
+
+      // ジョブの完了確認
+      const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
+        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), checkMetricsTask)
+        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), jobFailed)
+        .otherwise(waitForJobCompletion);
+
+      checkJobStatus.next(isJobComplete);
+    } else {
+      // データリポジトリタスクの完了確認
+      const isDataRepositoryTaskComplete = new sfn.Choice(this, 'IsDataRepositoryTaskComplete')
+        .when(sfn.Condition.stringEquals('$.dataRepositoryTasks.DataRepositoryTasks[0].Status', 'SUCCEEDED'), deleteFSx)
+        .otherwise(waitForDataRepositoryTask);
+
+      createDataRepositoryTask
+        .next(waitForDataRepositoryTask)
+        .next(checkDataRepositoryTasks)
+        .next(isDataRepositoryTaskComplete);
+
+      // ジョブの完了確認
+      const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
+        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), createDataRepositoryTask)
+        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), jobFailed)
+        .otherwise(waitForJobCompletion);
+
+      checkJobStatus.next(isJobComplete);
+    }
+
+    // 共通のフロー定義
+    definition = createLustreFileSystem
       .next(createDataRepositoryAssociation)
       .next(waitForFileSystem)
       .next(checkFileSystemStatus)
       .next(checkDataRepositoryAssociation)
-      .next(
-        isFileSystemAndAssociationAvailable
-          .when(sfn.Condition.and(
-            sfn.Condition.stringEquals('$.fileSystemStatus.FileSystems[0].Lifecycle', 'AVAILABLE'),
-            sfn.Condition.stringEquals('$.dataRepositoryStatus.Associations[0].Lifecycle', 'AVAILABLE')
-          ),
-            createLaunchTemplate
-              .next(updateComputeEnvironment)
-              .next(createJobDefinition)
-              .next(submitJob)
-              .next(waitForJobCompletion)
-              .next(checkJobStatus)
-              .next(isJobComplete)
-          )
-          .otherwise(waitForFileSystem)
-      );
+      .next(isFileSystemAndAssociationAvailable);
 
-    // メトリクスチェックのフローを追加
-    checkMetricsTask.next(shouldDeleteFSx);
+    // 終了フローの設定
     deleteFSx.next(setupComplete);
-    waitForNextCheck.next(checkMetricsTask);
 
-    new sfn.StateMachine(this, 'CreateLustreStateMachine', {
+    new sfn.StateMachine(this, `CreateLustre${context.envName}StateMachine`, {
       definition,
-      // timeout: cdk.Duration.hours(1),
       role: stepFunctionsRole
     });
   }
