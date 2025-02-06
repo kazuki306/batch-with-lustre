@@ -473,7 +473,7 @@ export class BatchWithLustreStack extends cdk.Stack {
         'Type': 'EXPORT_TO_REPOSITORY',
         'Paths': ['/scratch'],
         'Report': {
-          'Enabled': true
+          'Enabled': false
         }
       },
       iamResources: ['*'],
@@ -485,8 +485,11 @@ export class BatchWithLustreStack extends cdk.Stack {
       service: 'fsx',
       action: 'describeDataRepositoryTasks',
       parameters: {
-        'FileSystemId.$': '$.fileSystem.FileSystem.FileSystemId',
         'Filters': [
+          {
+            'Name': 'file-system-id',
+            'Values.$': "States.Array($.fileSystem.FileSystem.FileSystemId)"
+          },
           {
             'Name': 'type',
             'Values': ['EXPORT_TO_REPOSITORY']
