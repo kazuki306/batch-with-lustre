@@ -300,7 +300,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     });
 
     const waitForFileSystem = new sfn.Wait(this, 'WaitForFileSystem', {
-      time: sfn.WaitTime.duration(cdk.Duration.minutes(0.5))
+      time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
     });
 
     const checkFileSystemStatus = new tasks.CallAwsService(this, 'CheckFileSystemStatus', {
@@ -426,7 +426,7 @@ export class BatchWithLustreStack extends cdk.Stack {
 
     // ジョブステータスの確認を待機
     const waitForJobCompletion = new sfn.Wait(this, 'WaitForJobCompletion', {
-      time: sfn.WaitTime.duration(cdk.Duration.seconds(30))
+      time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
     });
 
     // ジョブステータスの確認タスク
@@ -489,10 +489,6 @@ export class BatchWithLustreStack extends cdk.Stack {
           {
             'Name': 'file-system-id',
             'Values.$': "States.Array($.fileSystem.FileSystem.FileSystemId)"
-          },
-          {
-            'Name': 'type',
-            'Values': ['EXPORT_TO_REPOSITORY']
           }
         ]
       },
@@ -550,7 +546,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     } else {
       // データリポジトリタスクの完了確認
       const isDataRepositoryTaskComplete = new sfn.Choice(this, 'IsDataRepositoryTaskComplete')
-        .when(sfn.Condition.stringEquals('$.dataRepositoryTasks.DataRepositoryTasks[0].Status', 'SUCCEEDED'), deleteFSx)
+        .when(sfn.Condition.stringEquals('$.dataRepositoryTasks.DataRepositoryTasks[0].Lifecycle', 'SUCCEEDED'),deleteFSx)
         .otherwise(waitForDataRepositoryTask);
 
       createDataRepositoryTask
