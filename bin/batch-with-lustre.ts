@@ -3,6 +3,7 @@ import * as cdk from 'aws-cdk-lib';
 import { BatchWithLustreStack } from '../lib/batch-with-lustre-stack';
 import { BatchWithoutLustreStack } from '../lib/batch-without-lustre-stack';
 import { BatchWithNewLustreStack } from '../lib/batch-with-new-lustre-stack';
+import { BatchWithEbsStack } from '../lib/batch-with-ebs-stack';
 
 const app = new cdk.App();
 
@@ -29,15 +30,25 @@ const type = app.node.tryGetContext('type');
 const context = app.node.tryGetContext(type);
 
 if (!context) {
-  throw new Error(`Invalid type: ${type}. Please specify a valid type using -c type=<autoExport|taskExport>`);
+  throw new Error(`Invalid type: ${type}. Please specify a valid type using -c type=<autoExport|taskExport|onlyEBS>`);
 }
 
-// 環境タイプに応じたBatchWithLustreStackを作成
-new BatchWithLustreStack(app, `BatchWithLustre${context.envName}Stack`, {
-  ...commonProps,
-  description: `Batch with Lustre file system stack (${context.envName})`,
-  autoExport: context.autoExport
-});
+// 環境タイプに応じたスタックを作成
+if (type === 'autoExport' || type === 'taskExport') {
+  // Lustreスタックを作成
+  new BatchWithLustreStack(app, `BatchWithLustre${context.envName}Stack`, {
+    ...commonProps,
+    description: `Batch with Lustre file system stack (${context.envName})`,
+    autoExport: context.autoExport
+  });
+} else if (type === 'onlyEBS') {
+  // EBSスタックを作成
+  new BatchWithEbsStack(app, `BatchWithEbs${context.envName}Stack`, {
+    ...commonProps,
+    description: `Batch with EBS volume stack (${context.envName})`,
+    ebsSizeGb: context.ebsSizeGb
+  });
+}
 
 // その他の既存のスタック
 // new BatchWithoutLustreStack(app, 'BatchWithoutLustreStack', {

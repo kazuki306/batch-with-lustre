@@ -22,7 +22,6 @@ export class BatchWithLustreStack extends cdk.Stack {
 
     const autoExport = props?.autoExport ?? true;
 
-    // VPCの作成
     const vpc = new ec2.Vpc(this, 'BatchVPC', {
       maxAzs: 2,
       natGateways: 1,
@@ -44,8 +43,8 @@ export class BatchWithLustreStack extends cdk.Stack {
     const bucket = new s3.Bucket(this, 'DataBucket', {
       versioned: true,
       encryption: s3.BucketEncryption.S3_MANAGED,
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // 開発環境用
-      autoDeleteObjects: true, // 開発環境用
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
     });
 
     // typeパラメータを取得
@@ -56,14 +55,8 @@ export class BatchWithLustreStack extends cdk.Stack {
     // ECRリポジトリの作成
     const ecrRepository = new ecr.Repository(this, 'BatchJobRepository', {
       repositoryName: `batch-with-lustre-job-${context.envName.toLowerCase()}`,
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // 開発環境用
-      emptyOnDelete: true, // 開発環境用
-      // lifecycleRules: [
-      //   {
-      //     maxImageCount: 3, // 最新の3つのイメージのみを保持
-      //     description: 'Keep only the last 3 images'
-      //   }
-      // ]
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      emptyOnDelete: true,
     });
 
     // ECRリポジトリのカスタムリソースに必要な権限を追加
@@ -124,12 +117,15 @@ export class BatchWithLustreStack extends cdk.Stack {
     const computeEnvironment = new batch.CfnComputeEnvironment(this, 'ComputeEnvironment', {
       type: 'MANAGED',
       computeResources: {
-        type: 'SPOT',
-        allocationStrategy: 'SPOT_PRICE_CAPACITY_OPTIMIZED',
-        maxvCpus: 4,
+        type: 'EC2',
+        // type: 'SPOT',
+        allocationStrategy: 'BEST_FIT_PROGRESSIVE',
+        // allocationStrategy: 'SPOT_PRICE_CAPACITY_OPTIMIZED',
+        maxvCpus: 256,
         minvCpus: 0,
         desiredvCpus: 0,
-        instanceTypes: ['optimal'],
+        // instanceTypes: ['optimal'],
+        instanceTypes: ['c4.8xlarge'],
         subnets: vpc.privateSubnets.map(subnet => subnet.subnetId),
         securityGroupIds: [lustreSecurityGroup.securityGroupId],
         instanceRole: batchInstanceProfile.attrArn,
@@ -288,7 +284,7 @@ export class BatchWithLustreStack extends cdk.Stack {
       parameters: {
         FileSystemType: 'LUSTRE',
         FileSystemTypeVersion: '2.15',
-        StorageCapacity: 1200,
+        StorageCapacity: 4800,
         SubnetIds: [vpc.privateSubnets[0].subnetId],
         SecurityGroupIds: [lustreSecurityGroup.securityGroupId],
         LustreConfiguration: {
@@ -372,7 +368,6 @@ export class BatchWithLustreStack extends cdk.Stack {
         ComputeEnvironment: computeEnvironment.ref,
         ServiceRole: batchServiceLinkedRole.roleArn,
         ComputeResources: {
-          AllocationStrategy: 'SPOT_PRICE_CAPACITY_OPTIMIZED',
           LaunchTemplate: {
             LaunchTemplateId: sfn.JsonPath.stringAt('$.launchTemplate.LaunchTemplate.LaunchTemplateId'),
             Version: '$Latest'
@@ -392,8 +387,8 @@ export class BatchWithLustreStack extends cdk.Stack {
         Type: 'container',
         ContainerProperties: {
           'Image.$': '$.containerImage',
-          Vcpus: 1,
-          Memory: 2048,
+          Vcpus: 16,
+          Memory: 30720,
           Volumes: [{
             Host: {
               SourcePath: '/fsx/scratch'

@@ -1,21 +1,30 @@
 #!/bin/bash
 
+# 使用方法:
+# $1: 書き込み回数 (デフォルト: 1)
+# $2: ファイルサイズ（GB） (デフォルト: 20)
+# $3: 書き込み先ディレクトリ (デフォルト: /data)
+
 # デフォルトの設定
 WRITE_COUNT=${1:-1}
 FILE_SIZE_GB=${2:-20}  # デフォルト20GB
-
-# 書き込み先ディレクトリを設定
-SCRATCH_DIR="/scratch"
+DATA_DIR=${3:-"/data"}
 
 # bs=200M = 0.2GBなので、指定GBサイズを0.2で割ってcount数を計算
 # 小数点以下を切り上げて、指定サイズ以上を確保
 COUNT=$(echo "scale=0; ($FILE_SIZE_GB / 0.2 + 0.5)/1" | bc)
+
+echo "ファイルシステムの状況:"
+echo "----------------------------------------"
+df -h
+echo "----------------------------------------"
 
 echo "設定情報:"
 echo "- 書き込み回数: ${WRITE_COUNT}回"
 echo "- 目標ファイルサイズ: ${FILE_SIZE_GB}GB"
 echo "- ブロックサイズ: 200M"
 echo "- カウント数: ${COUNT}"
+echo "- 書き込み先ディレクトリ: ${DATA_DIR}"
 echo "----------------------------------------"
 
 # 結果を保存する配列
@@ -33,13 +42,13 @@ for ((i=1; i<=WRITE_COUNT; i++)); do
     echo "ファイル${i}の書き込みを開始: $(date '+%Y-%m-%d %H:%M:%S')"
     
     # ファイル書き込みを実行
-    sudo dd if=/dev/zero of="${SCRATCH_DIR}/${file_name}.txt" bs=200M count=${COUNT} oflag=direct conv=fdatasync
+    sudo dd if=/dev/zero of="${DATA_DIR}/${file_name}.txt" bs=200M count=${COUNT} oflag=direct conv=fdatasync
     
     # 書き込み終了時刻を記録
     end_time=$(date +%s.%N)
     
     # 実際のファイルサイズを取得
-    file_size=$(ls -lh "${SCRATCH_DIR}/${file_name}.txt" | awk '{print $5}')
+    file_size=$(ls -lh "${DATA_DIR}/${file_name}.txt" | awk '{print $5}')
     
     # 経過時間を計算
     write_time=$(echo "${end_time} - ${start_time}" | bc)
@@ -48,11 +57,20 @@ for ((i=1; i<=WRITE_COUNT; i++)); do
     echo "  - 終了時刻: $(date '+%Y-%m-%d %H:%M:%S')"
     echo "  - 所要時間: ${write_time} 秒"
     echo "  - ファイルサイズ: ${file_size}"
-    echo "----------------------------------------"
     
     # 結果を配列に保存
     write_times[$i]=$write_time
     file_sizes[$i]=$file_size
+    
+    # 最後のループ以外でファイルを削除
+    if [ $i -lt $WRITE_COUNT ]; then
+        echo "ファイル${i}を削除します..."
+        sudo rm -f "${DATA_DIR}/${file_name}.txt"
+        echo "ファイル${i}の削除が完了"
+    else
+        echo "最後のファイルのため、削除をスキップします"
+    fi
+    echo "----------------------------------------"
 done
 
 echo "全ての書き込み処理が完了"

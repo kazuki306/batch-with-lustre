@@ -35,10 +35,10 @@ RUN apt-get clean && \
 WORKDIR /app
 
 # Copy shell script
-COPY scripts/write_test.sh .
+COPY scripts/write_delete_test_ebs.sh .
 
 # Make script executable
-RUN chmod +x write_test.sh
+RUN chmod +x write_delete_test_ebs.sh
 
-# Set default command (デフォルトで1回の書き込み、20GBのファイルサイズ)
-CMD ["./write_test.sh", "3", "20"]
+# Set default command (デフォルトで10回の書き込み、200GBのファイルサイズ、/scratchディレクトリ)
+CMD ["./write_delete_test_ebs.sh", "100", "20", "/data"]

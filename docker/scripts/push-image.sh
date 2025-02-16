@@ -11,8 +11,8 @@ DOCKER_DIR="$PROJECT_ROOT/docker"
 # 変数の設定
 AWS_REGION="${AWS_REGION:-ap-northeast-1}"  # 環境変数が設定されていない場合はデフォルト値を使用
 # ECR_REPOSITORY_NAME="batch-with-lustre-job"
-ECR_REPOSITORY_NAME="batch-with-lustre-job-autoexport"
-IMAGE_TAG="0.0.1"
+ECR_REPOSITORY_NAME="batch-with-ebs-job-onlyebs"
+IMAGE_TAG="0.0.4"
 
 echo "使用するAWSリージョン: ${AWS_REGION}"
 
