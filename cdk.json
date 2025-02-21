@@ -87,7 +87,7 @@
     },
     "onlyEBS": {
       "envName": "OnlyEBS",
-      "ebsSizeGb": 100
+      "ebsSizeGb": 500
     }
   }
 }

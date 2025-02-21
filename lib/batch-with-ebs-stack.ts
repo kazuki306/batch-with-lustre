@@ -16,7 +16,7 @@ export class BatchWithEbsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: BatchWithEbsStackProps) {
     super(scope, id, props);
 
-    const ebsSizeGb = props?.ebsSizeGb ?? 100;
+    const ebsSizeGb = props?.ebsSizeGb ?? 500;
 
     // 単一AZのVPCを作成
     const vpc = new ec2.Vpc(this, 'BatchVPC', {
@@ -130,7 +130,7 @@ export class BatchWithEbsStack extends cdk.Stack {
         minvCpus: 0,
         desiredvCpus: 0,
         // instanceTypes: ['optimal'],
-        instanceTypes: ['c4.8xlarge'],
+        instanceTypes: ['c4.4xlarge','m4.4xlarge', 'c4.8xlarge'],
         subnets: vpc.privateSubnets.map(subnet => subnet.subnetId),
         securityGroupIds: [batchSecurityGroup.securityGroupId],
         instanceRole: batchInstanceProfile.attrArn,
@@ -150,6 +150,29 @@ export class BatchWithEbsStack extends cdk.Stack {
           order: 1
         }
       ]
+    });
+
+    // コンテナ用のIAMロールを作成
+    const containerJobRole = new iam.Role(this, 'ContainerJobRole', {
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+      inlinePolicies: {
+        'S3Permissions': new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                's3:PutObject',
+                's3:GetObject',
+                's3:ListBucket'
+              ],
+              resources: [
+                bucket.bucketArn,
+                `${bucket.bucketArn}/*`
+              ]
+            })
+          ]
+        })
+      }
     });
 
     // Step Functions用のIAMロール
@@ -214,6 +237,14 @@ export class BatchWithEbsStack extends cdk.Stack {
                 'batch:DescribeJobs'
               ],
               resources: ['*']
+            }),
+            // コンテナのIAMロールをBatchに渡す権限
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'iam:PassRole'
+              ],
+              resources: [containerJobRole.roleArn]
             })
           ]
         })
@@ -228,7 +259,9 @@ export class BatchWithEbsStack extends cdk.Stack {
         AvailabilityZone: vpc.privateSubnets[0].availabilityZone,
         Size: ebsSizeGb,
         VolumeType: 'gp3',
-        Encrypted: false
+        Encrypted: false,
+        Iops: 16000,  // gp3の最大IOPS
+        Throughput: 1000  // gp3の最大スループット（MiB/s）
       },
       iamResources: ['*'],
       resultPath: '$.volume'
@@ -310,10 +343,24 @@ export class BatchWithEbsStack extends cdk.Stack {
       parameters: {
         JobDefinitionName: sfn.JsonPath.format('ebs-job-definition-{}', sfn.JsonPath.stringAt('$.volume.VolumeId')),
         Type: 'container',
+        RetryStrategy: {
+          Attempts: 5,
+          EvaluateOnExit: [
+            {
+              OnStatusReason: 'Host EC2*',
+              Action: 'RETRY'
+            },
+            {
+              OnReason: '*',
+              Action: 'EXIT'
+            }
+          ]
+        },
         ContainerProperties: {
           'Image.$': '$.containerImage',
-          Vcpus: 16,
+          Vcpus: 32,
           Memory: 30720,
+          JobRoleArn: containerJobRole.roleArn,
           Volumes: [{
             Host: {
               SourcePath: '/data'
@@ -382,6 +429,13 @@ export class BatchWithEbsStack extends cdk.Stack {
     // ジョブの完了確認
     const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
       .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), setupComplete)
+      .when(
+        sfn.Condition.and(
+          sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'),
+          sfn.Condition.stringMatches('$.jobStatus.Jobs[0].StatusReason', '*Host EC2*')
+        ),
+        waitForJobCompletion
+      )
       .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), jobFailed)
       .otherwise(waitForJobCompletion);
 

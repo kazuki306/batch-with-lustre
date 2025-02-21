@@ -125,7 +125,7 @@ export class BatchWithLustreStack extends cdk.Stack {
         minvCpus: 0,
         desiredvCpus: 0,
         // instanceTypes: ['optimal'],
-        instanceTypes: ['c4.8xlarge'],
+        instanceTypes: ['c4.4xlarge','m4.4xlarge', 'c4.8xlarge'],
         subnets: vpc.privateSubnets.map(subnet => subnet.subnetId),
         securityGroupIds: [lustreSecurityGroup.securityGroupId],
         instanceRole: batchInstanceProfile.attrArn,
@@ -387,7 +387,7 @@ export class BatchWithLustreStack extends cdk.Stack {
         Type: 'container',
         ContainerProperties: {
           'Image.$': '$.containerImage',
-          Vcpus: 16,
+          Vcpus: 32,
           Memory: 30720,
           Volumes: [{
             Host: {
