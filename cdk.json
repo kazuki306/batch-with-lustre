@@ -87,7 +87,13 @@
     },
     "onlyEBS": {
       "envName": "OnlyEBS",
-      "ebsSizeGb": 500
+      "ebsSizeGb": 500,
+      "ebsIOPS": 5000,
+      "ebsThroughput": 500,
+      "jobDefinitionRetryAttempts": 5,
+      "jobDefinitionVcpus": 32,
+      "jobDefinitionMemory": 30000,
+      "ecrRepositoryName": "batch-job-with-ebs"
     }
   }
 }

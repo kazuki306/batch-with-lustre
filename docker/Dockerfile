@@ -50,5 +50,5 @@ RUN chmod +x write_delete_test_ebs_with_s3.sh
 
 # Set default command (デフォルトで10回の書き込み、200GBのファイルサイズ、/scratch ディレクトリ)
 # CMD ["./write_delete_test_lustre.sh", "10", "200", "/scratch"]
-CMD ["./write_delete_test_ebs_with_s3.sh", "10", "200", "/data", "batchwithebsonlyebsstack-databuckete3889a50-pceotlc6z0be"]
+CMD ["./write_delete_test_ebs_with_s3.sh", "5", "20", "/data", "batchwithebsonlyebsstack-databuckete3889a50-pceotlc6z0be"]
 # CMD ["./write_delete_test_ebs_with_s3_sync.sh", "10", "200", "/data", "batchwithebsonlyebsstack-databuckete3889a50-pceotlc6z0be"]
