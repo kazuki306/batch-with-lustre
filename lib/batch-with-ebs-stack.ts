@@ -6,6 +6,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
 interface BatchWithEbsStackProps extends cdk.StackProps {
@@ -15,9 +16,17 @@ interface BatchWithEbsStackProps extends cdk.StackProps {
 export class BatchWithEbsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: BatchWithEbsStackProps) {
     super(scope, id, props);
+const ebsSizeGb = props?.ebsSizeGb ?? 500;
 
-    const ebsSizeGb = props?.ebsSizeGb ?? 500;
+// Secrets Managerにebsのサイズを格納
+const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
+  description: 'EBSボリュームのサイズ情報を格納',
+  secretObjectValue: {
+    ebsSizeGb: cdk.SecretValue.unsafePlainText(ebsSizeGb.toString()),
+  },
+});
 
+// 単一AZのVPCを作成
     // 単一AZのVPCを作成
     const vpc = new ec2.Vpc(this, 'BatchVPC', {
       maxAzs: 1,
@@ -181,6 +190,14 @@ export class BatchWithEbsStack extends cdk.Stack {
       inlinePolicies: {
         'EbsPermissions': new iam.PolicyDocument({
           statements: [
+            // Secrets Managerの権限
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'secretsmanager:GetSecretValue'
+              ],
+              resources: [ebsSecret.secretArn]
+            }),
             // EBS操作の権限
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
@@ -251,13 +268,32 @@ export class BatchWithEbsStack extends cdk.Stack {
       }
     });
 
+    // Secrets Managerからシークレットを取得
+    const getSecret = new tasks.CallAwsService(this, 'GetSecret', {
+      service: 'secretsmanager',
+      action: 'getSecretValue',
+      parameters: {
+        SecretId: ebsSecret.secretName
+      },
+      iamResources: [ebsSecret.secretArn],
+      resultPath: '$.secretTemp'
+    });
+
+    // シークレットから必要なパラメータを抽出
+    const extractParameters = new sfn.Pass(this, 'ExtractParameters', {
+      parameters: {
+        'SecretsManagerParameters.$': 'States.StringToJson($.secretTemp.SecretString)'
+      },
+      resultPath: '$.credentials'
+    });
+
     // EBSボリュームの作成
     const createEbs = new tasks.CallAwsService(this, 'CreateEbs', {
       service: 'ec2',
       action: 'createVolume',
       parameters: {
         AvailabilityZone: vpc.privateSubnets[0].availabilityZone,
-        Size: ebsSizeGb,
+        'Size.$': 'States.StringToJson($.credentials.SecretsManagerParameters.ebsSizeGb)',
         VolumeType: 'gp3',
         Encrypted: false,
         Iops: 16000,  // gp3の最大IOPS
@@ -442,7 +478,9 @@ export class BatchWithEbsStack extends cdk.Stack {
     checkJobStatus.next(isJobComplete);
 
     // ステートマシンの定義
-    const definition = createEbs
+    const definition = getSecret
+      .next(extractParameters)
+      .next(createEbs)
       .next(waitForEbsCreation)
       .next(checkEbsStatus)
       .next(isEbsAvailable);
