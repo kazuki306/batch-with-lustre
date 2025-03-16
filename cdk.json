@@ -93,7 +93,13 @@
       "jobDefinitionRetryAttempts": 5,
       "jobDefinitionVcpus": 32,
       "jobDefinitionMemory": 30000,
-      "ecrRepositoryName": "batch-job-with-ebs"
+      "ecrRepositoryName": "batch-job-with-ebs",
+      "computeEnvironmentType": "SPOT",
+      "computeEnvironmentAllocationStrategy": "BEST_FIT_PROGRESSIVE",
+      "computeEnvironmentMaxvCpus": 256,
+      "computeEnvironmentMinvCpus": 0,
+      "computeEnvironmentDesiredvCpus": 0,
+      "computeEnvironmentInstanceTypes": ["optimal"]
     }
   }
 }

@@ -17,6 +17,12 @@ interface BatchWithEbsStackProps extends cdk.StackProps {
   jobDefinitionVcpus?: number;
   jobDefinitionMemory?: number;
   ecrRepositoryName?: string;
+  computeEnvironmentType?: string;
+  computeEnvironmentAllocationStrategy?: string;
+  computeEnvironmentMaxvCpus?: number;
+  computeEnvironmentMinvCpus?: number;
+  computeEnvironmentDesiredvCpus?: number;
+  computeEnvironmentInstanceTypes?: string[];
 }
 
 export class BatchWithEbsStack extends cdk.Stack {
@@ -29,20 +35,26 @@ const jobDefinitionRetryAttempts = props?.jobDefinitionRetryAttempts ?? 5;
 const jobDefinitionVcpus = props?.jobDefinitionVcpus ?? 32;
 const jobDefinitionMemory = props?.jobDefinitionMemory ?? 30000;
 const ecrRepositoryName = props?.ecrRepositoryName ?? 'batch-job-with-ebs';
+const computeEnvironmentType = props?.computeEnvironmentType ?? 'SPOT'; //computeEnvironmentType can be chosen from EC2 or SPOT
+const computeEnvironmentAllocationStrategy = props?.computeEnvironmentAllocationStrategy ?? 'SPOT_PRICE_CAPACITY_OPTIMIZED'; //When computeEnvironmentType is set to 'EC2', BEST_FIT_PROGRESSIVE shold be selected, and when set to 'SPOT', SPOT_PRICE_CAPACITY_OPTIMIZED should be selected
+const computeEnvironmentMaxvCpus = props?.computeEnvironmentMaxvCpus ?? 256;
+const computeEnvironmentMinvCpus = props?.computeEnvironmentMinvCpus ?? 0;
+const computeEnvironmentDesiredvCpus = props?.computeEnvironmentDesiredvCpus ?? 0;
+const computeEnvironmentInstanceTypes = props?.computeEnvironmentInstanceTypes ?? ['optimal']; //When explicitly specifying instance types, specify them in array format. Example: ['c4.4xlarge','m4.4xlarge', 'c4.8xlarge']
 
-// ECRリポジトリの作成
+// Create ECR repository
 const ecrRepository = new ecr.Repository(this, 'BatchJobRepository', {
   repositoryName: ecrRepositoryName,
   removalPolicy: cdk.RemovalPolicy.DESTROY,
   emptyOnDelete: true,
 });
 
-// コンテナイメージURIの生成
+// Generate container image URI
 const containerImageUri = `${this.account}.dkr.ecr.${this.region}.amazonaws.com/${ecrRepositoryName}:latest`;
 
-// Secrets Managerにebsのサイズと関連パラメータを格納
+// Store EBS size and related parameters in Secrets Manager
 const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
-  description: 'EBSボリュームとジョブ定義のパラメータを格納',
+  description: 'Configuration values for executing AWS Batch jobs with StepFunction',
   secretObjectValue: {
     ebsSizeGb: cdk.SecretValue.unsafePlainText(ebsSizeGb.toString()),
     ebsIOPS: cdk.SecretValue.unsafePlainText(ebsIOPS.toString()),
@@ -54,7 +66,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
   },
 });
 
-      // 単一AZのVPCを作成
+      // Create a VPC in a single AZ
       const vpc = new ec2.Vpc(this, 'BatchVPC', {
         maxAzs: 1,
         natGateways: 1,
@@ -72,7 +84,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         ]
       });
 
-      // S3バケットの作成
+      // Create S3 bucket
       const bucket = new s3.Bucket(this, 'DataBucket', {
         versioned: true,
         encryption: s3.BucketEncryption.S3_MANAGED,
@@ -80,9 +92,9 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         autoDeleteObjects: true,
       });
 
-      // 既に上部でtypeパラメータとECRリポジトリを作成済み
+      // Type parameter and ECR repository already created above
 
-      // ECRリポジトリのカスタムリソースに必要な権限を追加
+      // Add permissions required for ECR repository custom resource
       const customResourceRole = new iam.Role(this, 'CustomECRAutoDeleteImagesRole', {
         assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
         managedPolicies: [
@@ -105,7 +117,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         }
       });
 
-      // Batch用のセキュリティグループ
+      // Security group for Batch
       const batchSecurityGroup = new ec2.SecurityGroup(this, 'BatchSecurityGroup', {
         vpc,
         description: 'Security group for AWS Batch',
@@ -137,26 +149,23 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         roles: [batchInstanceRole.roleName]
       });
 
-      // AWS Batchのサービスリンクロールを参照
+      // Reference AWS Batch service-linked role
       const batchServiceLinkedRole = iam.Role.fromRoleName(
         this,
         'BatchServiceLinkedRole',
         `aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch`
       );
 
-      // Batchのコンピューティング環境
+      // Batch compute environment
       const computeEnvironment = new batch.CfnComputeEnvironment(this, 'BatchJobWithEbsComputeEnvironment', {
         type: 'MANAGED',
         computeResources: {
-          type: 'EC2',
-          // type: 'SPOT',
-          allocationStrategy: 'BEST_FIT_PROGRESSIVE',
-          // allocationStrategy: 'SPOT_PRICE_CAPACITY_OPTIMIZED',
-          maxvCpus: 256,
-          minvCpus: 0,
-          desiredvCpus: 0,
-          // instanceTypes: ['optimal'],
-          instanceTypes: ['c4.4xlarge','m4.4xlarge', 'c4.8xlarge'],
+          type: computeEnvironmentType,
+          allocationStrategy: computeEnvironmentAllocationStrategy,
+          maxvCpus: computeEnvironmentMaxvCpus,
+          minvCpus: computeEnvironmentMinvCpus,
+          desiredvCpus: computeEnvironmentDesiredvCpus,
+          instanceTypes: computeEnvironmentInstanceTypes,
           subnets: vpc.privateSubnets.map(subnet => subnet.subnetId),
           securityGroupIds: [batchSecurityGroup.securityGroupId],
           instanceRole: batchInstanceProfile.attrArn,
@@ -166,7 +175,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         replaceComputeEnvironment: true,
       });
 
-      // ジョブキュー
+      // Job queue
       const jobQueue = new batch.CfnJobQueue(this, 'JobQueue', {
         priority: 1,
         state: 'ENABLED',
@@ -178,7 +187,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         ]
       });
 
-      // コンテナ用のIAMロールを作成
+      // Create IAM role for container
       const containerJobRole = new iam.Role(this, 'ContainerJobRole', {
         assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
         inlinePolicies: {
@@ -201,13 +210,13 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         }
       });
 
-      // Step Functions用のIAMロール
+      // IAM role for Step Functions
       const stepFunctionsRole = new iam.Role(this, 'CreateEbsStateMachineRole', {
         assumedBy: new iam.ServicePrincipal('states.amazonaws.com'),
         inlinePolicies: {
           'EbsPermissions': new iam.PolicyDocument({
             statements: [
-              // Secrets Managerの権限
+              // Permissions for Secrets Manager
               new iam.PolicyStatement({
                 effect: iam.Effect.ALLOW,
                 actions: [
@@ -215,7 +224,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
                 ],
                 resources: [ebsSecret.secretArn]
               }),
-              // EBS操作の権限
+              // Permissions for EBS operations
               new iam.PolicyStatement({
                 effect: iam.Effect.ALLOW,
                 actions: [
@@ -228,7 +237,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
                 ],
                 resources: ['*']
               }),
-              // EC2起動テンプレートの権限
+              // Permissions for EC2 launch templates
               new iam.PolicyStatement({
                 effect: iam.Effect.ALLOW,
                 actions: [
@@ -238,7 +247,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
                 ],
                 resources: ['*']
               }),
-              // Batchコンピューティング環境の更新権限
+              // Permissions to update Batch compute environment
               new iam.PolicyStatement({
                 effect: iam.Effect.ALLOW,
                 actions: [
@@ -246,7 +255,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
                 ],
                 resources: ['*']
               }),
-              // サービスリンクロールをBatchに渡す権限
+              // Permission to pass service-linked role to Batch
               new iam.PolicyStatement({
                 effect: iam.Effect.ALLOW,
                 actions: [
@@ -254,7 +263,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
                 ],
                 resources: [`arn:aws:iam::${this.account}:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch`]
               }),
-              // Batchジョブ定義の作成権限
+              // Permission to create Batch job definitions
               new iam.PolicyStatement({
                 effect: iam.Effect.ALLOW,
                 actions: [
@@ -263,7 +272,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
                 ],
                 resources: ['*']
               }),
-              // Batchジョブの送信と確認の権限
+              // Permissions to submit and check Batch jobs
               new iam.PolicyStatement({
                 effect: iam.Effect.ALLOW,
                 actions: [
@@ -272,7 +281,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
                 ],
                 resources: ['*']
               }),
-              // コンテナのIAMロールをBatchに渡す権限
+              // Permission to pass container IAM role to Batch
               new iam.PolicyStatement({
                 effect: iam.Effect.ALLOW,
                 actions: [
@@ -285,7 +294,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         }
       });
 
-      // Secrets Managerからシークレットを取得
+      // Get secret from Secrets Manager
       const getSecret = new tasks.CallAwsService(this, 'GetSecret', {
         service: 'secretsmanager',
         action: 'getSecretValue',
@@ -296,7 +305,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         resultPath: '$.secretTemp'
       });
 
-      // シークレットから必要なパラメータを抽出
+      // Extract required parameters from secret
       const extractParameters = new sfn.Pass(this, 'ExtractParameters', {
         parameters: {
           'SecretsManagerParameters.$': 'States.StringToJson($.secretTemp.SecretString)'
@@ -304,7 +313,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         resultPath: '$.credentials'
       });
 
-      // EBSボリュームの作成
+      // Create EBS volume
       const createEbs = new tasks.CallAwsService(this, 'CreateEbs', {
         service: 'ec2',
         action: 'createVolume',
@@ -320,12 +329,12 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         resultPath: '$.volume'
       });
 
-      // EBSボリュームの作成を待機
+      // Wait for EBS volume creation
       const waitForEbsCreation = new sfn.Wait(this, 'WaitForEbsCreation', {
         time: sfn.WaitTime.duration(cdk.Duration.seconds(30))
       });
 
-      // EBSボリュームのステータスを確認
+      // Check EBS volume status
       const checkEbsStatus = new tasks.CallAwsService(this, 'CheckEbsStatus', {
         service: 'ec2',
         action: 'describeVolumes',
@@ -336,7 +345,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         resultPath: '$.volumeStatus'
       });
 
-      // 起動テンプレートの作成
+      // Create launch template
       const createLaunchTemplate = new tasks.CallAwsService(this, 'CreateLaunchTemplate', {
         service: 'ec2',
         action: 'createLaunchTemplate',
@@ -347,31 +356,13 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
               '{}',
               sfn.JsonPath.stringAt(`States.Base64Encode(States.Format('Content-Type: multipart/mixed; boundary="==MYBOUNDARY=="\nMIME-Version: 1.0\n\n--==MYBOUNDARY==\nContent-Type: text/cloud-boothook; charset="us-ascii"\n\nsudo yum install unzip -y\nsudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"\nsudo unzip awscliv2.zip\nsudo ./aws/install\nTOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")\naws ec2 attach-volume --volume-id {} --instance-id $(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id) --device /dev/xvdf\nsleep 10\nif [ "$(sudo file -s /dev/xvdf)" = "/dev/xvdf: data" ]; then\n    sudo mkfs -t xfs /dev/xvdf\nfi\nsudo mkdir -p /data\nsudo mount /dev/xvdf /data\n\n--==MYBOUNDARY==--', $.volume.VolumeId))`)
             ),
-            // BlockDeviceMappings: [
-            //   {
-            //     // ルートボリューム
-            //     DeviceName: '/dev/xvda',
-            //     Ebs: {
-            //       VolumeSize: 30,
-            //       VolumeType: 'gp3',
-            //       DeleteOnTermination: true
-            //     }
-            //   },
-            //   {
-            //     // 追加のEBSボリュームのマウントポイント
-            //     DeviceName: '/dev/xvdf',
-            //     Ebs: {
-            //       DeleteOnTermination: false
-            //     }
-            //   }
-            // ]
           }
         },
         iamResources: ['*'],
         resultPath: '$.launchTemplate'
       });
 
-      // コンピューティング環境を更新
+      // Update computing environment
       const updateComputeEnvironment = new tasks.CallAwsService(this, 'UpdateComputeEnvironment', {
         service: 'batch',
         action: 'updateComputeEnvironment',
@@ -389,7 +380,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         resultPath: '$.updateResult'
       });
 
-      // ジョブ定義の作成
+      // Create job definition
       const createJobDefinition = new tasks.CallAwsService(this, 'CreateJobDefinition', {
         service: 'batch',
         action: 'registerJobDefinition',
@@ -431,7 +422,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         resultPath: '$.jobDefinition'
       });
 
-      // ジョブの送信
+      // Submit job
       const submitJob = new tasks.CallAwsService(this, 'SubmitJob', {
         service: 'batch',
         action: 'submitJob',
@@ -444,12 +435,12 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         resultPath: '$.submittedJob'
       });
 
-      // ジョブ完了を待機
+      // Wait for job completion
       const waitForJobCompletion = new sfn.Wait(this, 'WaitForJobCompletion', {
         time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
       });
 
-      // ジョブステータスの確認
+      // Check job status
       const checkJobStatus = new tasks.CallAwsService(this, 'CheckJobStatus', {
         service: 'batch',
         action: 'describeJobs',
@@ -460,14 +451,14 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         resultPath: '$.jobStatus'
       });
 
-      // 終了ステートの定義
-      const setupComplete = new sfn.Succeed(this, 'SetupComplete');
+      // Define completion states
+      const jobComplete = new sfn.Succeed(this, 'jobComplete');
       const jobFailed = new sfn.Fail(this, 'JobFailed', {
         cause: 'Batch Job Failed',
         error: 'BatchJobError'
       });
 
-      // EBSボリュームの可用性チェック
+      // Check EBS volume availability
       const isEbsAvailable = new sfn.Choice(this, 'IsEbsAvailable')
         .when(sfn.Condition.stringEquals('$.volumeStatus.Volumes[0].State', 'available'),
           createLaunchTemplate
@@ -479,9 +470,9 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
         )
         .otherwise(waitForEbsCreation);
 
-      // ジョブの完了確認
+      // Verify job completion
       const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
-        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), setupComplete)
+        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), jobComplete)
         .when(
           sfn.Condition.and(
             sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'),
@@ -494,7 +485,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
 
       checkJobStatus.next(isJobComplete);
 
-      // ステートマシンの定義
+      // Define state machine
       const definition = getSecret
         .next(extractParameters)
         .next(createEbs)
