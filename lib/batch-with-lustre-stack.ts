@@ -385,6 +385,19 @@ export class BatchWithLustreStack extends cdk.Stack {
       parameters: {
         JobDefinitionName: sfn.JsonPath.format('lustre-job-definition-{}', sfn.JsonPath.stringAt('$.fileSystem.FileSystem.FileSystemId')),
         Type: 'container',
+        RetryStrategy: {
+          Attempts: 5,
+          EvaluateOnExit: [
+            {
+              OnStatusReason: 'Host EC2*',
+              Action: 'RETRY'
+            },
+            {
+              OnReason: '*',
+              Action: 'EXIT'
+            }
+          ]
+        },
         ContainerProperties: {
           'Image.$': '$.containerImage',
           Vcpus: 32,
@@ -534,6 +547,13 @@ export class BatchWithLustreStack extends cdk.Stack {
       // ジョブの完了確認
       const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
         .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), checkMetricsTask)
+        .when(
+          sfn.Condition.and(
+            sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'),
+            sfn.Condition.stringMatches('$.jobStatus.Jobs[0].StatusReason', '*Host EC2*')
+          ),
+          waitForJobCompletion
+        )
         .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), jobFailed)
         .otherwise(waitForJobCompletion);
 
@@ -552,6 +572,13 @@ export class BatchWithLustreStack extends cdk.Stack {
       // ジョブの完了確認
       const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
         .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), createDataRepositoryTask)
+        .when(
+          sfn.Condition.and(
+            sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'),
+            sfn.Condition.stringMatches('$.jobStatus.Jobs[0].StatusReason', '*Host EC2*')
+          ),
+          waitForJobCompletion
+        )
         .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), jobFailed)
         .otherwise(waitForJobCompletion);
 
