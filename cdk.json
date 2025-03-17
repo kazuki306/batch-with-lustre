@@ -96,7 +96,7 @@
       "ecrRepositoryName": "batch-job-with-ebs",
       "computeEnvironmentType": "SPOT",
       "computeEnvironmentAllocationStrategy": "BEST_FIT_PROGRESSIVE",
-      "computeEnvironmentMaxvCpus": 60,
+      "computeEnvironmentMaxvCpus": 256,
       "computeEnvironmentMinvCpus": 0,
       "computeEnvironmentDesiredvCpus": 0,
       "computeEnvironmentInstanceTypes": ["optimal"],
