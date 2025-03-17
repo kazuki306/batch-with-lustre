@@ -405,6 +405,12 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
             'Vcpus.$': 'States.StringToJson($.credentials.SecretsManagerParameters.jobDefinitionVcpus)',
             'Memory.$': 'States.StringToJson($.credentials.SecretsManagerParameters.jobDefinitionMemory)',
             JobRoleArn: containerJobRole.roleArn,
+            Environment: [
+              {
+                Name: 'S3_BUCKET_NAME',
+                Value: bucket.bucketName
+              }
+            ],
             Volumes: [{
               Host: {
                 SourcePath: '/data'

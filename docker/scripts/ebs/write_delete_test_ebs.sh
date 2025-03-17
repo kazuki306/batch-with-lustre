@@ -4,20 +4,11 @@
 # $1: 書き込み回数 (デフォルト: 1)
 # $2: ファイルサイズ（GB） (デフォルト: 20)
 # $3: 書き込み先ディレクトリ (デフォルト: /data)
-# 環境変数 S3_BUCKET_NAME: S3バケット名 (必須)
-
-# S3バケット名が環境変数に設定されているか確認
-if [ -z "$S3_BUCKET_NAME" ]; then
-    echo "エラー: 環境変数 S3_BUCKET_NAME が設定されていません"
-    echo "使用方法: S3_BUCKET_NAME=バケット名 $0 [書き込み回数] [ファイルサイズGB] [書き込み先ディレクトリ]"
-    exit 1
-fi
 
 # デフォルトの設定
 WRITE_COUNT=${1:-1}
 FILE_SIZE_GB=${2:-20}  # デフォルト20GB
 DATA_DIR=${3:-"/data"}
-S3_BUCKET=$S3_BUCKET_NAME
 
 # bs=200M = 0.2GBなので、指定GBサイズを0.2で割ってcount数を計算
 # 小数点以下を切り上げて、指定サイズ以上を確保
@@ -34,7 +25,6 @@ echo "- 目標ファイルサイズ: ${FILE_SIZE_GB}GB"
 echo "- ブロックサイズ: 200M"
 echo "- カウント数: ${COUNT}"
 echo "- 書き込み先ディレクトリ: ${DATA_DIR}"
-echo "- S3バケット名: ${S3_BUCKET}"
 echo "----------------------------------------"
 
 # 結果を保存する配列
@@ -72,23 +62,13 @@ for ((i=1; i<=WRITE_COUNT; i++)); do
     write_times[$i]=$write_time
     file_sizes[$i]=$file_size
     
-    # 最後のループの場合、S3にコピーしてから削除
-    if [ $i -eq $WRITE_COUNT ]; then
-        echo "最後のファイルをS3にコピーします..."
-        aws s3 cp "${DATA_DIR}/${file_name}.txt" "s3://${S3_BUCKET}/${file_name}.txt"
-        if [ $? -eq 0 ]; then
-            echo "S3へのコピーが完了しました"
-            echo "ファイル${i}を削除します..."
-            sudo rm -f "${DATA_DIR}/${file_name}.txt"
-            echo "ファイル${i}の削除が完了"
-        else
-            echo "S3へのコピーに失敗しました"
-            exit 1
-        fi
-    else
+    # 最後のループ以外でファイルを削除
+    if [ $i -lt $WRITE_COUNT ]; then
         echo "ファイル${i}を削除します..."
         sudo rm -f "${DATA_DIR}/${file_name}.txt"
         echo "ファイル${i}の削除が完了"
+    else
+        echo "最後のファイルのため、削除をスキップします"
     fi
     echo "----------------------------------------"
 done
