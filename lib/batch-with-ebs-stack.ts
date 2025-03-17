@@ -39,14 +39,14 @@ const jobDefinitionVcpus = props?.jobDefinitionVcpus ?? 32;
 const jobDefinitionMemory = props?.jobDefinitionMemory ?? 30000;
 const ecrRepositoryName = props?.ecrRepositoryName ?? 'batch-job-with-ebs';
 const computeEnvironmentType = props?.computeEnvironmentType ?? 'SPOT'; //computeEnvironmentType can be chosen from EC2 or SPOT
-const computeEnvironmentAllocationStrategy = props?.computeEnvironmentAllocationStrategy ?? 'SPOT_PRICE_CAPACITY_OPTIMIZED'; //When computeEnvironmentType is set to 'EC2', BEST_FIT_PROGRESSIVE shold be selected, and when set to 'SPOT', SPOT_PRICE_CAPACITY_OPTIMIZED should be selected
+const computeEnvironmentAllocationStrategy = props?.computeEnvironmentAllocationStrategy ?? 'SPOT_PRICE_CAPACITY_OPTIMIZED'; //If computeEnvironmentType is set to 'EC2', select BEST_FIT_PROGRESSIVE; if set to 'SPOT', select SPOT_PRICE_CAPACITY_OPTIMIZED
 const computeEnvironmentMaxvCpus = props?.computeEnvironmentMaxvCpus ?? 256;
 const computeEnvironmentMinvCpus = props?.computeEnvironmentMinvCpus ?? 0;
 const computeEnvironmentDesiredvCpus = props?.computeEnvironmentDesiredvCpus ?? 0;
-const computeEnvironmentInstanceTypes = props?.computeEnvironmentInstanceTypes ?? ['optimal']; //When explicitly specifying instance types, specify them in array format. Example: ['c4.4xlarge','m4.4xlarge', 'c4.8xlarge']
+const computeEnvironmentInstanceTypes = props?.computeEnvironmentInstanceTypes ?? ['optimal']; //When explicitly specifying instance types, specify them in array format. Example: ["c4.4xlarge","m4.4xlarge", "c4.8xlarge"]
 const waitForEbsCreationSeconds = props?.waitForEbsCreationSeconds ?? 30;
 const waitForJobCompletionSeconds = props?.waitForJobCompletionSeconds ?? 300;
-const deleteEbs = props?.deleteEbs ?? false;
+const deleteEbs = props?.deleteEbs ?? false; //Set to true if you want to delete the EBS after the batch job finishes, false if you don't want to delete it.
 
 // Create ECR repository
 const ecrRepository = new ecr.Repository(this, 'BatchJobRepository', {
@@ -467,11 +467,28 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
       });
 
       // Define completion states
-      const jobComplete = new sfn.Succeed(this, 'jobComplete');
+      const jobSucceeded = new sfn.Succeed(this, 'JobSucceeded');
       const jobFailed = new sfn.Fail(this, 'JobFailed', {
         cause: 'Batch Job Failed',
         error: 'BatchJobError'
       });
+
+      // Delete EBS volume task
+      const deleteEbsVolume = new tasks.CallAwsService(this, 'DeleteEbsVolume', {
+        service: 'ec2',
+        action: 'deleteVolume',
+        parameters: {
+          'VolumeId.$': '$.volume.VolumeId'
+        },
+        iamResources: ['*'],
+        resultPath: '$.deleteVolumeResult'
+      });
+
+      // Check if EBS should be deleted
+      const shouldDeleteEbs = new sfn.Choice(this, 'ShouldDeleteEbs')
+        .when(sfn.Condition.stringEquals('$.credentials.SecretsManagerParameters.deleteEbs', 'true'),
+          deleteEbsVolume.next(jobSucceeded))
+        .otherwise(jobSucceeded);
 
       // Check EBS volume availability
       const isEbsAvailable = new sfn.Choice(this, 'IsEbsAvailable')
@@ -487,7 +504,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
 
       // Verify job completion
       const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
-        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), jobComplete)
+        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), shouldDeleteEbs)
         .when(
           sfn.Condition.and(
             sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'),

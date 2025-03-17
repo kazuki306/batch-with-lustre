@@ -96,10 +96,10 @@
       "ecrRepositoryName": "batch-job-with-ebs",
       "computeEnvironmentType": "SPOT",
       "computeEnvironmentAllocationStrategy": "BEST_FIT_PROGRESSIVE",
-      "computeEnvironmentMaxvCpus": 256,
+      "computeEnvironmentMaxvCpus": 60,
       "computeEnvironmentMinvCpus": 0,
       "computeEnvironmentDesiredvCpus": 0,
-      "computeEnvironmentInstanceTypes": ["optimal"],
+      "computeEnvironmentInstanceTypes": ["c4.4xlarge","m4.4xlarge", "c4.8xlarge"],
       "waitForEbsCreationSeconds": 30,
       "waitForJobCompletionSeconds": 300,
       "deleteEbs": true

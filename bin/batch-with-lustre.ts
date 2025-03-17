@@ -44,9 +44,9 @@ if (type === 'autoExport' || type === 'taskExport') {
 } else if (type === 'onlyEBS') {
   // EBSスタックを作成
   new BatchWithEbsStack(app, `BatchWithEbs${context.envName}Stack`, {
-    ...commonProps,
     description: `Batch with EBS volume stack (${context.envName})`,
-    ebsSizeGb: context.ebsSizeGb
+    ...commonProps,
+    ...context
   });
 }
 
