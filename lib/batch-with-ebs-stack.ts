@@ -145,7 +145,8 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
                 effect: iam.Effect.ALLOW,
                 actions: [
                   'ec2:AttachVolume',
-                  'ec2:DescribeVolumes'
+                  'ec2:DescribeVolumes',
+                  'ec2:TerminateInstances'
                 ],
                 resources: ['*']
               })
@@ -363,7 +364,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
           LaunchTemplateData: {
             UserData: sfn.JsonPath.format(
               '{}',
-              sfn.JsonPath.stringAt(`States.Base64Encode(States.Format('Content-Type: multipart/mixed; boundary="==MYBOUNDARY=="\nMIME-Version: 1.0\n\n--==MYBOUNDARY==\nContent-Type: text/cloud-boothook; charset="us-ascii"\n\nsudo yum install unzip -y\nsudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"\nsudo unzip awscliv2.zip\nsudo ./aws/install\nTOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")\naws ec2 attach-volume --volume-id {} --instance-id $(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id) --device /dev/xvdf\nsleep 10\nif [ "$(sudo file -s /dev/xvdf)" = "/dev/xvdf: data" ]; then\n    sudo mkfs -t xfs /dev/xvdf\nfi\nsudo mkdir -p /data\nsudo mount /dev/xvdf /data\n\n--==MYBOUNDARY==--', $.volume.VolumeId))`)
+              sfn.JsonPath.stringAt(`States.Base64Encode(States.Format('Content-Type: multipart/mixed; boundary="==MYBOUNDARY=="\nMIME-Version: 1.0\n\n--==MYBOUNDARY==\nContent-Type: text/x-shellscript; charset="us-ascii"\n\n#!/bin/bash\nsudo yum install unzip -y\nsudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"\nsudo unzip awscliv2.zip\nsudo ./aws/install\nTOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")\nINSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)\n\nATTACH_RESULT=$(aws ec2 attach-volume --volume-id {} --instance-id $INSTANCE_ID --device /dev/xvdf 2>&1)\n\nif echo "$ATTACH_RESULT" | grep -q "VolumeInUse"; then\n  aws ec2 terminate-instances --instance-ids $INSTANCE_ID\n  sleep 60\n  exit 1\nfi\n\nsleep 10\nif [ "$(sudo file -s /dev/xvdf)" = "/dev/xvdf: data" ]; then\n    sudo mkfs -t xfs /dev/xvdf\nfi\nsudo mkdir -p /data\nsudo mount /dev/xvdf /data\n\n--==MYBOUNDARY==--', $.volume.VolumeId))`)
             ),
           }
         },

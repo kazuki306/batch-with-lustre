@@ -99,7 +99,7 @@
       "computeEnvironmentMaxvCpus": 60,
       "computeEnvironmentMinvCpus": 0,
       "computeEnvironmentDesiredvCpus": 0,
-      "computeEnvironmentInstanceTypes": ["c4.4xlarge","m4.4xlarge", "c4.8xlarge"],
+      "computeEnvironmentInstanceTypes": ["optimal"],
       "waitForEbsCreationSeconds": 30,
       "waitForJobCompletionSeconds": 300,
       "deleteEbs": true
