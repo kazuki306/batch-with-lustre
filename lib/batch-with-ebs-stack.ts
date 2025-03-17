@@ -23,6 +23,9 @@ interface BatchWithEbsStackProps extends cdk.StackProps {
   computeEnvironmentMinvCpus?: number;
   computeEnvironmentDesiredvCpus?: number;
   computeEnvironmentInstanceTypes?: string[];
+  waitForEbsCreationSeconds?: number;
+  waitForJobCompletionSeconds?: number;
+  deleteEbs?: boolean;
 }
 
 export class BatchWithEbsStack extends cdk.Stack {
@@ -41,6 +44,9 @@ const computeEnvironmentMaxvCpus = props?.computeEnvironmentMaxvCpus ?? 256;
 const computeEnvironmentMinvCpus = props?.computeEnvironmentMinvCpus ?? 0;
 const computeEnvironmentDesiredvCpus = props?.computeEnvironmentDesiredvCpus ?? 0;
 const computeEnvironmentInstanceTypes = props?.computeEnvironmentInstanceTypes ?? ['optimal']; //When explicitly specifying instance types, specify them in array format. Example: ['c4.4xlarge','m4.4xlarge', 'c4.8xlarge']
+const waitForEbsCreationSeconds = props?.waitForEbsCreationSeconds ?? 30;
+const waitForJobCompletionSeconds = props?.waitForJobCompletionSeconds ?? 300;
+const deleteEbs = props?.deleteEbs ?? false;
 
 // Create ECR repository
 const ecrRepository = new ecr.Repository(this, 'BatchJobRepository', {
@@ -63,6 +69,9 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
     jobDefinitionVcpus: cdk.SecretValue.unsafePlainText(jobDefinitionVcpus.toString()),
     jobDefinitionMemory: cdk.SecretValue.unsafePlainText(jobDefinitionMemory.toString()),
     jobDefinitionContainerImage: cdk.SecretValue.unsafePlainText(containerImageUri),
+    waitForEbsCreationSeconds: cdk.SecretValue.unsafePlainText(waitForEbsCreationSeconds.toString()),
+    waitForJobCompletionSeconds: cdk.SecretValue.unsafePlainText(waitForJobCompletionSeconds.toString()),
+    deleteEbs: cdk.SecretValue.unsafePlainText(deleteEbs.toString()),
   },
 });
 
@@ -331,7 +340,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
 
       // Wait for EBS volume creation
       const waitForEbsCreation = new sfn.Wait(this, 'WaitForEbsCreation', {
-        time: sfn.WaitTime.duration(cdk.Duration.seconds(30))
+        time: sfn.WaitTime.secondsPath('$.credentials.SecretsManagerParameters.waitForEbsCreationSeconds')
       });
 
       // Check EBS volume status
@@ -443,7 +452,7 @@ const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
 
       // Wait for job completion
       const waitForJobCompletion = new sfn.Wait(this, 'WaitForJobCompletion', {
-        time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
+        time: sfn.WaitTime.secondsPath('$.credentials.SecretsManagerParameters.waitForJobCompletionSeconds')
       });
 
       // Check job status

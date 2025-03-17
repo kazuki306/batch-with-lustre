@@ -99,7 +99,10 @@
       "computeEnvironmentMaxvCpus": 256,
       "computeEnvironmentMinvCpus": 0,
       "computeEnvironmentDesiredvCpus": 0,
-      "computeEnvironmentInstanceTypes": ["optimal"]
+      "computeEnvironmentInstanceTypes": ["optimal"],
+      "waitForEbsCreationSeconds": 30,
+      "waitForJobCompletionSeconds": 300,
+      "deleteEbs": true
     }
   }
 }
