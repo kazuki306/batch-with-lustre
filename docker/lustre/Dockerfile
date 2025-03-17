@@ -22,12 +22,6 @@ RUN apt-get update && \
     sudo \
     unzip
 
-# Install AWS CLI v2
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
-    && unzip awscliv2.zip \
-    && ./aws/install \
-    && rm -rf aws awscliv2.zip
-
 # Install Lustre client
 RUN wget -O - https://fsx-lustre-client-repo-public-keys.s3.amazonaws.com/fsx-ubuntu-public-key.asc | gpg --dearmor | tee /usr/share/keyrings/fsx-ubuntu-public-key.gpg >/dev/null \
     && bash -c 'echo "deb [signed-by=/usr/share/keyrings/fsx-ubuntu-public-key.gpg] https://fsx-lustre-client-repo.s3.amazonaws.com/ubuntu focal main" > /etc/apt/sources.list.d/fsxlustreclientrepo.list' \
@@ -43,12 +37,10 @@ RUN apt-get clean && \
 WORKDIR /app
 
 # Copy shell script
-COPY scripts/write_delete_test_ebs_with_s3.sh .
+COPY lustre/write_delete_test_lustre.sh .
 
 # Make script executable
-RUN chmod +x write_delete_test_ebs_with_s3.sh
+RUN chmod +x write_delete_test_lustre.sh
 
 # Set default command (デフォルトで10回の書き込み、200GBのファイルサイズ、/scratch ディレクトリ)
-# CMD ["./write_delete_test_lustre.sh", "10", "200", "/scratch"]
-CMD ["./write_delete_test_ebs_with_s3.sh", "5", "20", "/data", "batchwithebsonlyebsstack-databuckete3889a50-pceotlc6z0be"]
-# CMD ["./write_delete_test_ebs_with_s3_sync.sh", "10", "200", "/data", "batchwithebsonlyebsstack-databuckete3889a50-pceotlc6z0be"]
+CMD ["./write_delete_test_lustre.sh", "10", "200", "/scratch"]

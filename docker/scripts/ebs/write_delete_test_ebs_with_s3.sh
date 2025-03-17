@@ -46,6 +46,23 @@ echo "開始時刻: $(date '+%Y-%m-%d %H:%M:%S')"
 for ((i=1; i<=WRITE_COUNT; i++)); do
     file_name="test_file_${i}"
     
+    # 既存の大きな番号のファイルをチェック
+    skip_current=false
+    for existing_file in "${DATA_DIR}"/test_file_*.txt; do
+        if [ -f "$existing_file" ]; then
+            existing_num=$(echo "$existing_file" | grep -o '[0-9]\+' | tail -1)
+            if [ "$existing_num" -gt "$i" ]; then
+                echo "ファイル${i}をスキップ: より大きな番号のファイル(${existing_num})が存在します"
+                skip_current=true
+                break
+            fi
+        fi
+    done
+    
+    if [ "$skip_current" = true ]; then
+        continue
+    fi
+    
     # 書き込み開始時刻を記録
     start_time=$(date +%s.%N)
     
@@ -101,7 +118,11 @@ echo "=== 実行サマリー ==="
 echo "総書き込みファイル数: ${WRITE_COUNT}"
 echo "指定ファイルサイズ: ${FILE_SIZE_GB}GB"
 for ((i=1; i<=WRITE_COUNT; i++)); do
-    echo "ファイル${i}:"
-    echo "  - 所要時間: ${write_times[$i]} 秒"
-    echo "  - サイズ: ${file_sizes[$i]}"
+    if [ -n "${write_times[$i]}" ]; then
+        echo "ファイル${i}:"
+        echo "  - 所要時間: ${write_times[$i]} 秒"
+        echo "  - サイズ: ${file_sizes[$i]}"
+    else
+        echo "ファイル${i}: スキップされました"
+    fi
 done
