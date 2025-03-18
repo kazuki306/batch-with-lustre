@@ -102,6 +102,7 @@
       "computeEnvironmentInstanceTypes": ["optimal"],
       "waitForEbsCreationSeconds": 30,
       "waitForJobCompletionSeconds": 300,
+      "waitAfterDetachSeconds": 10,
       "deleteEbs": true
     }
   }

@@ -25,6 +25,7 @@ interface BatchWithEbsStackProps extends cdk.StackProps {
   computeEnvironmentInstanceTypes?: string[];
   waitForEbsCreationSeconds?: number;
   waitForJobCompletionSeconds?: number;
+  waitAfterDetachSeconds?: number;
   deleteEbs?: boolean;
 }
 
@@ -46,6 +47,7 @@ export class BatchWithEbsStack extends cdk.Stack {
     const computeEnvironmentInstanceTypes = props?.computeEnvironmentInstanceTypes ?? ['optimal']; //When explicitly specifying instance types, specify them in array format. Example: ["c4.4xlarge","m4.4xlarge", "c4.8xlarge"]
     const waitForEbsCreationSeconds = props?.waitForEbsCreationSeconds ?? 30;
     const waitForJobCompletionSeconds = props?.waitForJobCompletionSeconds ?? 300;
+    const waitAfterDetachSeconds = props?.waitAfterDetachSeconds ?? 10;
     const deleteEbs = props?.deleteEbs ?? false; //Set to true if you want to delete the EBS after the batch job finishes, false if you don't want to delete it.
 
     // Create ECR repository
@@ -71,6 +73,7 @@ export class BatchWithEbsStack extends cdk.Stack {
         jobDefinitionContainerImage: cdk.SecretValue.unsafePlainText(containerImageUri),
         waitForEbsCreationSeconds: cdk.SecretValue.unsafePlainText(waitForEbsCreationSeconds.toString()),
         waitForJobCompletionSeconds: cdk.SecretValue.unsafePlainText(waitForJobCompletionSeconds.toString()),
+        waitAfterDetachSeconds: cdk.SecretValue.unsafePlainText(waitAfterDetachSeconds.toString()),
         deleteEbs: cdk.SecretValue.unsafePlainText(deleteEbs.toString()),
       },
     });
@@ -474,6 +477,22 @@ export class BatchWithEbsStack extends cdk.Stack {
       error: 'BatchJobError'
     });
 
+    // Detach EBS volume task
+    const detachEbsVolume = new tasks.CallAwsService(this, 'DetachEbsVolume', {
+      service: 'ec2',
+      action: 'detachVolume',
+      parameters: {
+        'VolumeId.$': '$.volume.VolumeId'
+      },
+      iamResources: ['*'],
+      resultPath: '$.detachVolumeResult'
+    });
+
+    // Wait after detaching volume
+    const waitAfterDetach = new sfn.Wait(this, 'WaitAfterDetach', {
+      time: sfn.WaitTime.secondsPath('$.credentials.SecretsManagerParameters.waitAfterDetachSeconds')
+    });
+
     // Delete EBS volume task
     const deleteEbsVolume = new tasks.CallAwsService(this, 'DeleteEbsVolume', {
       service: 'ec2',
@@ -485,10 +504,19 @@ export class BatchWithEbsStack extends cdk.Stack {
       resultPath: '$.deleteVolumeResult'
     });
 
+    // エラーハンドリングの設定: detachEbsVolumeでエラーが発生しても処理を続行
+    detachEbsVolume.addCatch(waitAfterDetach, {
+      errors: ['States.ALL'],
+      resultPath: '$.detachVolumeError'
+    });
+
     // Check if EBS should be deleted
     const shouldDeleteEbs = new sfn.Choice(this, 'ShouldDeleteEbs')
       .when(sfn.Condition.stringEquals('$.credentials.SecretsManagerParameters.deleteEbs', 'true'),
-        deleteEbsVolume.next(jobSucceeded))
+        detachEbsVolume
+          .next(waitAfterDetach)
+          .next(deleteEbsVolume)
+          .next(jobSucceeded))
       .otherwise(jobSucceeded);
 
     // Check EBS volume availability

@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
 import { BatchWithLustreStack } from '../lib/batch-with-lustre-stack';
-import { BatchWithoutLustreStack } from '../lib/batch-without-lustre-stack';
-import { BatchWithNewLustreStack } from '../lib/batch-with-new-lustre-stack';
 import { BatchWithEbsStack } from '../lib/batch-with-ebs-stack';
 
 const app = new cdk.App();
@@ -49,16 +47,5 @@ if (type === 'autoExport' || type === 'taskExport') {
     ...context
   });
 }
-
-// その他の既存のスタック
-// new BatchWithoutLustreStack(app, 'BatchWithoutLustreStack', {
-//   ...commonProps,
-//   description: 'Batch without Lustre file system stack'
-// });
-
-// new BatchWithNewLustreStack(app, 'BatchWithNewLustreStack', {
-//   ...commonProps,
-//   description: 'Batch with new Lustre file system and S3 integration stack'
-// });
 
 app.synth();
