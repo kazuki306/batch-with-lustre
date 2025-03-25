@@ -1,0 +1,116 @@
+# Task Export モード
+
+Task Export モードは、AWS BatchとAmazon FSx for Lustreを組み合わせ、明示的なデータリポジトリタスクを使用してS3バケットにデータをエクスポートするデプロイオプションです。
+
+## 概要
+
+このモードでは、FSx for Lustreファイルシステムが作成され、指定されたS3バケットからデータを自動的にインポートします。ただし、S3へのエクスポートは自動的には行われず、ジョブ完了後に明示的なデータリポジトリタスク（EXPORT_TO_REPOSITORY）を実行してデータをS3にエクスポートします。
+
+## アーキテクチャ
+
+![Task Export モードのアーキテクチャ](../images/task_export_architecture.png)
+
+Task Export モードでは以下のコンポーネントが連携します：
+
+1. **Amazon FSx for Lustre**: 高性能な共有ファイルシステム
+2. **Amazon S3**: データの永続的な保存先
+3. **AWS Batch**: コンピューティングジョブの実行
+4. **AWS Step Functions**: ワークフローの調整
+5. **FSx データリポジトリタスク**: 明示的なエクスポート処理
+
+## 主な特徴
+
+### 明示的なエクスポート機能
+
+Auto Exportモードとは異なり、Task Exportモードではファイルシステム上での変更は自動的にS3に反映されません。代わりに、ジョブ完了後に明示的なデータリポジトリタスクを実行してデータをエクスポートします：
+
+- **EXPORT_TO_REPOSITORY**: 指定したパス（/scratch）のデータをS3バケットにエクスポート
+- エクスポートタスクの完了を待機してから、ファイルシステムを削除（オプション）
+
+**重要な注意点**: Batchジョブの実行中に作成または変更されたファイルは、ジョブ実行中にはS3に自動的に同期されません。これらのファイルは、Batchジョブが完了した後に、Step Functionsワークフローによって明示的に作成される[データリポジトリタスク](https://docs.aws.amazon.com/ja_jp/fsx/latest/LustreGuide/data-repository-tasks.html)によってS3にエクスポートされます。このため、ジョブ実行中にS3からデータにアクセスする必要がある場合は、別の方法（例：S3へのダイレクトアップロード）を検討する必要があります。
+
+### 自動インポート機能
+
+S3からLustreへの自動インポートは引き続き有効です：
+
+- **新規ファイル (NEW)**: S3に追加された新しいファイルはLustreに自動的にインポート
+- **変更ファイル (CHANGED)**: S3で変更されたファイルはLustreに反映
+- **削除ファイル (DELETED)**: S3から削除されたファイルはLustreからも削除
+
+## デプロイパラメータ
+
+`cdk.json`の`taskExport`セクションで以下のパラメータをカスタマイズできます：
+
+| パラメータ | 説明 | デフォルト値 |
+|------------|------|------------|
+| envName | 環境名 | "TaskExport" |
+| autoExport | 自動エクスポート機能の有効化 | false |
+| deleteLustre | ジョブ完了後のLustre削除フラグ | true |
+| lustreFileSystemTypeVersion | Lustreバージョン | "2.15" |
+| lustreStorageCapacity | ストレージ容量（GB） | 2400 |
+| lustreImportedFileChunkSize | インポートチャンクサイズ（MB） | 1024 |
+| ecrRepositoryName | ECRリポジトリ名 | "batch-job-with-lustre-task-export" |
+| computeEnvironmentType | コンピューティング環境タイプ | "SPOT" |
+| computeEnvironmentAllocationStrategy | 割り当て戦略 | "BEST_FIT_PROGRESSIVE" |
+| computeEnvironmentInstanceTypes | インスタンスタイプ | ["optimal"] |
+| computeEnvironmentMinvCpus | 最小vCPU数 | 0 |
+| computeEnvironmentMaxvCpus | 最大vCPU数 | 256 |
+| computeEnvironmentDesiredvCpus | 希望vCPU数 | 0 |
+| jobDefinitionRetryAttempts | ジョブ再試行回数 | 5 |
+| jobDefinitionVcpus | ジョブあたりのvCPU数 | 32 |
+| jobDefinitionMemory | ジョブあたりのメモリ（MB） | 30000 |
+| waitForLustreCreationSeconds | Lustre作成待機時間（秒） | 30 |
+| waitForJobCompletionSeconds | ジョブ完了待機時間（秒） | 300 |
+| waitForDataRepositoryTaskSeconds | データリポジトリタスク待機時間（秒） | 300 |
+
+## Step Functions ワークフロー
+
+Task Export モードのStep Functionsワークフローは以下のステップで構成されています：
+
+1. **Secrets Managerからパラメータ取得**
+2. **FSx for Lustreファイルシステム作成**
+3. **S3バケットとのデータリポジトリ関連付け作成**
+4. **ファイルシステムの可用性確認**
+5. **EC2起動テンプレート作成**
+6. **Batchコンピューティング環境更新**
+7. **ジョブ定義登録**
+8. **ジョブ送信**
+9. **ジョブ完了確認**
+10. **データリポジトリタスク作成（EXPORT_TO_REPOSITORY）**
+11. **データリポジトリタスク完了確認**
+12. **ファイルシステム削除（オプション）**
+
+## Auto Export モードとの違い
+
+| 機能 | Task Export モード | Auto Export モード |
+|------|-------------------|-------------------|
+| S3からのインポート | 自動 | 自動 |
+| S3へのエクスポート | 明示的なタスク実行 | 自動 |
+| クリーンアップトリガー | データリポジトリタスク完了 | CloudWatchメトリクス |
+| ユースケース | バッチ処理、大規模データセット | リアルタイム処理、継続的データ生成 |
+
+## ユースケース
+
+Task Export モードは以下のようなシナリオに適しています：
+
+- **バッチ処理**: 処理完了後に一括でデータをエクスポートする場合
+- **大規模データセット**: 大量のデータを処理し、処理完了後にまとめてエクスポートする場合
+- **制御されたエクスポート**: エクスポートのタイミングを明示的に制御したい場合
+
+## 制限事項
+
+- エクスポートタスクの実行中はファイルシステムのパフォーマンスに影響を与える可能性があります
+- 大量のファイルをエクスポートする場合、エクスポートタスクの完了に時間がかかる場合があります
+- エクスポートタスクが失敗した場合、手動での介入が必要になる場合があります
+
+## デプロイ方法
+
+```bash
+npx cdk deploy -c type=taskExport
+```
+
+## 関連リソース
+
+- [Amazon FSx for Lustre データリポジトリタスク](https://docs.aws.amazon.com/fsx/latest/LustreGuide/data-repository-tasks.html)
+- [AWS Batch ドキュメント](https://docs.aws.amazon.com/batch/latest/userguide/what-is-batch.html)
+- [AWS Step Functions ドキュメント](https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html)
