@@ -12,7 +12,8 @@ interface CheckMetricsResult {
 export const handler = async (event: CheckMetricsEvent): Promise<CheckMetricsResult> => {
   const client = new CloudWatchClient({ region: process.env.REGION });
   const now = new Date();
-  const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
+  const timeDiffMinutes = process.env.TIME_DIFF ? parseInt(process.env.TIME_DIFF, 10) : 15;
+  const startTime = new Date(now.getTime() - timeDiffMinutes * 60 * 1000);
 
   try {
     // AgeOfOldestQueuedMessageメトリクスを取得
@@ -35,12 +36,12 @@ export const handler = async (event: CheckMetricsEvent): Promise<CheckMetricsRes
                 }
               ]
             },
-            Period: 60,
+            Period: process.env.PERIOD ? parseInt(process.env.PERIOD, 10) : 60,
             Stat: 'Average'
           }
         }
       ],
-      StartTime: thirtyMinutesAgo,
+      StartTime: startTime,
       EndTime: now
     });
 
@@ -56,6 +57,7 @@ export const handler = async (event: CheckMetricsEvent): Promise<CheckMetricsRes
     }
 
     const metricResult = response.MetricDataResults[0];
+    
     if (!metricResult.Values || metricResult.Values.length === 0) {
       console.warn('メトリクスの値が取得できませんでした');
       return {

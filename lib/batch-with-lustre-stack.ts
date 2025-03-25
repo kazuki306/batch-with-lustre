@@ -8,19 +8,83 @@ import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
-import { version } from 'os';
-import { FileSystemTypeVersion } from 'aws-cdk-lib/aws-fsx';
-
 interface BatchWithLustreStackProps extends cdk.StackProps {
+  envName?: string;
   autoExport?: boolean;
+  lustreStorageCapacity?: number;
+  lustreFileSystemTypeVersion?: string;
+  lustreImportedFileChunkSize?: number;
+  jobDefinitionRetryAttempts?: number;
+  jobDefinitionVcpus?: number;
+  jobDefinitionMemory?: number;
+  ecrRepositoryName?: string;
+  computeEnvironmentType?: string;
+  computeEnvironmentAllocationStrategy?: string;
+  computeEnvironmentMaxvCpus?: number;
+  computeEnvironmentMinvCpus?: number;
+  computeEnvironmentDesiredvCpus?: number;
+  computeEnvironmentInstanceTypes?: string[];
+  waitForLustreCreationSeconds?: number;
+  waitForJobCompletionSeconds?: number;
+  waitForCheckMetricsSeconds?: number;
+  deleteLustre?: boolean;
+  lambdaPeriodSeconds?: number;
+  lambdaTimeDiffMinutes?: number;
 }
 
 export class BatchWithLustreStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: BatchWithLustreStackProps) {
     super(scope, id, props);
 
+    const envName = props?.envName ?? 'Default';
     const autoExport = props?.autoExport ?? true;
+    const lustreStorageCapacity = props?.lustreStorageCapacity ?? 2400;
+    const lustreFileSystemTypeVersion = props?.lustreFileSystemTypeVersion ?? '2.15';
+    const lustreImportedFileChunkSize = props?.lustreImportedFileChunkSize ?? 1024;
+    const jobDefinitionRetryAttempts = props?.jobDefinitionRetryAttempts ?? 5;
+    const jobDefinitionVcpus = props?.jobDefinitionVcpus ?? 32;
+    const jobDefinitionMemory = props?.jobDefinitionMemory ?? 30000;
+    const ecrRepositoryName = props?.ecrRepositoryName ?? 'batch-job-with-lustre-auto-export';
+    const computeEnvironmentType = props?.computeEnvironmentType ?? 'SPOT';
+    const computeEnvironmentAllocationStrategy = props?.computeEnvironmentAllocationStrategy ?? 'BEST_FIT_PROGRESSIVE';
+    const computeEnvironmentMaxvCpus = props?.computeEnvironmentMaxvCpus ?? 256;
+    const computeEnvironmentMinvCpus = props?.computeEnvironmentMinvCpus ?? 0;
+    const computeEnvironmentDesiredvCpus = props?.computeEnvironmentDesiredvCpus ?? 0;
+    const computeEnvironmentInstanceTypes = props?.computeEnvironmentInstanceTypes ?? ['optimal'];
+    const waitForLustreCreationSeconds = props?.waitForLustreCreationSeconds ?? 30;
+    const waitForJobCompletionSeconds = props?.waitForJobCompletionSeconds ?? 300;
+    const waitForCheckMetricsSeconds = props?.waitForCheckMetricsSeconds ?? 10;
+    const deleteLustre = props?.deleteLustre ?? true;
+
+    // ECRリポジトリの作成
+    const ecrRepository = new ecr.Repository(this, 'BatchJobRepository', {
+      repositoryName: ecrRepositoryName,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      emptyOnDelete: true,
+    });
+
+    // コンテナイメージURIを生成
+    const containerImageUri = `${this.account}.dkr.ecr.${this.region}.amazonaws.com/${ecrRepositoryName}:latest`;
+
+    // Secrets Managerに設定値を格納
+    const lustreSecret = new secretsmanager.Secret(this, 'BatchWithLustreAutoExportSecret', {
+      description: 'Configuration values for executing AWS Batch jobs with FSx for Lustre and StepFunction',
+      secretObjectValue: {
+        lustreStorageCapacity: cdk.SecretValue.unsafePlainText(lustreStorageCapacity.toString()),
+        lustreFileSystemTypeVersion: cdk.SecretValue.unsafePlainText(lustreFileSystemTypeVersion),
+        lustreImportedFileChunkSize: cdk.SecretValue.unsafePlainText(lustreImportedFileChunkSize.toString()),
+        jobDefinitionRetryAttempts: cdk.SecretValue.unsafePlainText(jobDefinitionRetryAttempts.toString()),
+        jobDefinitionVcpus: cdk.SecretValue.unsafePlainText(jobDefinitionVcpus.toString()),
+        jobDefinitionMemory: cdk.SecretValue.unsafePlainText(jobDefinitionMemory.toString()),
+        jobDefinitionContainerImage: cdk.SecretValue.unsafePlainText(containerImageUri),
+        waitForLustreCreationSeconds: cdk.SecretValue.unsafePlainText(waitForLustreCreationSeconds.toString()),
+        waitForJobCompletionSeconds: cdk.SecretValue.unsafePlainText(waitForJobCompletionSeconds.toString()),
+        waitForCheckMetricsSeconds: cdk.SecretValue.unsafePlainText(waitForCheckMetricsSeconds.toString()),
+        deleteLustre: cdk.SecretValue.unsafePlainText(deleteLustre.toString()),
+      },
+    });
 
     const vpc = new ec2.Vpc(this, 'BatchVPC', {
       maxAzs: 2,
@@ -47,40 +111,28 @@ export class BatchWithLustreStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
-    // typeパラメータを取得
-    const app = scope.node.root as cdk.App;
-    const type = app.node.tryGetContext('type');
-    const context = app.node.tryGetContext(type);
-
-    // ECRリポジトリの作成
-    const ecrRepository = new ecr.Repository(this, 'BatchJobRepository', {
-      repositoryName: `batch-with-lustre-job-${context.envName.toLowerCase()}`,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      emptyOnDelete: true,
-    });
-
     // ECRリポジトリのカスタムリソースに必要な権限を追加
-    const customResourceRole = new iam.Role(this, 'CustomECRAutoDeleteImagesRole', {
-      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole')
-      ],
-      inlinePolicies: {
-        'ECRPermissions': new iam.PolicyDocument({
-          statements: [
-            new iam.PolicyStatement({
-              effect: iam.Effect.ALLOW,
-              actions: [
-                'ecr:DescribeRepositories',
-                'ecr:ListImages',
-                'ecr:BatchDeleteImage'
-              ],
-              resources: [ecrRepository.repositoryArn]
-            })
-          ]
-        })
-      }
-    });
+    // const customResourceRole = new iam.Role(this, 'CustomECRAutoDeleteImagesRole', {
+    //   assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+    //   managedPolicies: [
+    //     iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole')
+    //   ],
+    //   inlinePolicies: {
+    //     'ECRPermissions': new iam.PolicyDocument({
+    //       statements: [
+    //         new iam.PolicyStatement({
+    //           effect: iam.Effect.ALLOW,
+    //           actions: [
+    //             'ecr:DescribeRepositories',
+    //             'ecr:ListImages',
+    //             'ecr:BatchDeleteImage'
+    //           ],
+    //           resources: [ecrRepository.repositoryArn]
+    //         })
+    //       ]
+    //     })
+    //   }
+    // });
 
     // FSx for Lustre用のセキュリティグループ
     const lustreSecurityGroup = new ec2.SecurityGroup(this, 'LustreSecurityGroup', {
@@ -117,15 +169,12 @@ export class BatchWithLustreStack extends cdk.Stack {
     const computeEnvironment = new batch.CfnComputeEnvironment(this, 'ComputeEnvironment', {
       type: 'MANAGED',
       computeResources: {
-        type: 'EC2',
-        // type: 'SPOT',
-        allocationStrategy: 'BEST_FIT_PROGRESSIVE',
-        // allocationStrategy: 'SPOT_PRICE_CAPACITY_OPTIMIZED',
-        maxvCpus: 256,
-        minvCpus: 0,
-        desiredvCpus: 0,
-        // instanceTypes: ['optimal'],
-        instanceTypes: ['c4.4xlarge','m4.4xlarge', 'c4.8xlarge'],
+        type: computeEnvironmentType,
+        allocationStrategy: computeEnvironmentAllocationStrategy,
+        maxvCpus: computeEnvironmentMaxvCpus,
+        minvCpus: computeEnvironmentMinvCpus,
+        desiredvCpus: computeEnvironmentDesiredvCpus,
+        instanceTypes: computeEnvironmentInstanceTypes,
         subnets: vpc.privateSubnets.map(subnet => subnet.subnetId),
         securityGroupIds: [lustreSecurityGroup.securityGroupId],
         instanceRole: batchInstanceProfile.attrArn,
@@ -148,14 +197,19 @@ export class BatchWithLustreStack extends cdk.Stack {
     });
 
     // CloudWatchメトリクスをチェックするLambda関数
+    const lambdaPeriodSeconds = props?.lambdaPeriodSeconds ?? 60;
+    const lambdaTimeDiffMinutes = props?.lambdaTimeDiffMinutes ?? 15;
+
     const checkMetricsFunction = new nodejs.NodejsFunction(this, 'CheckMetricsFunction', {
       entry: 'lib/lambda/check-metrics/index.ts',
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.seconds(60),
-      memorySize: 256,
+      memorySize: 128,
       environment: {
         REGION: this.region,
+        PERIOD: lambdaPeriodSeconds.toString(),
+        TIME_DIFF: lambdaTimeDiffMinutes.toString(),
       },
       bundling: {
         minify: true,
@@ -271,10 +325,37 @@ export class BatchWithLustreStack extends cdk.Stack {
                 'lambda:InvokeFunction'
               ],
               resources: [checkMetricsFunction.functionArn]
+            }),
+            // Secrets Managerへのアクセス権限
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'secretsmanager:GetSecretValue'
+              ],
+              resources: [lustreSecret.secretArn]
             })
           ]
         })
       }
+    });
+
+    // Secrets Managerから設定値を取得
+    const getSecret = new tasks.CallAwsService(this, 'GetSecret', {
+      service: 'secretsmanager',
+      action: 'getSecretValue',
+      parameters: {
+        SecretId: lustreSecret.secretName
+      },
+      iamResources: [lustreSecret.secretArn],
+      resultPath: '$.secretTemp'
+    });
+
+    // 必要なパラメータを抽出
+    const extractParameters = new sfn.Pass(this, 'ExtractParameters', {
+      parameters: {
+        'SecretsManagerParameters.$': 'States.StringToJson($.secretTemp.SecretString)'
+      },
+      resultPath: '$.credentials'
     });
 
     // StepFunctionsのステートマシン
@@ -283,8 +364,8 @@ export class BatchWithLustreStack extends cdk.Stack {
       action: 'createFileSystem',
       parameters: {
         FileSystemType: 'LUSTRE',
-        FileSystemTypeVersion: '2.15',
-        StorageCapacity: 4800,
+        'FileSystemTypeVersion.$': '$.credentials.SecretsManagerParameters.lustreFileSystemTypeVersion',
+        'StorageCapacity.$': 'States.StringToJson($.credentials.SecretsManagerParameters.lustreStorageCapacity)',
         SubnetIds: [vpc.privateSubnets[0].subnetId],
         SecurityGroupIds: [lustreSecurityGroup.securityGroupId],
         LustreConfiguration: {
@@ -296,7 +377,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     });
 
     const waitForFileSystem = new sfn.Wait(this, 'WaitForFileSystem', {
-      time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
+      time: sfn.WaitTime.secondsPath('$.credentials.SecretsManagerParameters.waitForLustreCreationSeconds')
     });
 
     const checkFileSystemStatus = new tasks.CallAwsService(this, 'CheckFileSystemStatus', {
@@ -328,7 +409,7 @@ export class BatchWithLustreStack extends cdk.Stack {
         'FileSystemPath': '/scratch',
         'DataRepositoryPath': bucket.s3UrlForObject('/'),
         'BatchImportMetaDataOnCreate': true,
-        'ImportedFileChunkSize': 1024,
+        'ImportedFileChunkSize.$': 'States.StringToJson($.credentials.SecretsManagerParameters.lustreImportedFileChunkSize)',
         'S3': {
           'AutoImportPolicy': {
             'Events': ['NEW', 'CHANGED', 'DELETED']
@@ -386,7 +467,7 @@ export class BatchWithLustreStack extends cdk.Stack {
         JobDefinitionName: sfn.JsonPath.format('lustre-job-definition-{}', sfn.JsonPath.stringAt('$.fileSystem.FileSystem.FileSystemId')),
         Type: 'container',
         RetryStrategy: {
-          Attempts: 5,
+          'Attempts.$': 'States.StringToJson($.credentials.SecretsManagerParameters.jobDefinitionRetryAttempts)',
           EvaluateOnExit: [
             {
               OnStatusReason: 'Host EC2*',
@@ -399,9 +480,9 @@ export class BatchWithLustreStack extends cdk.Stack {
           ]
         },
         ContainerProperties: {
-          'Image.$': '$.containerImage',
-          Vcpus: 32,
-          Memory: 30720,
+          'Image.$': '$.credentials.SecretsManagerParameters.jobDefinitionContainerImage',
+          'Vcpus.$': 'States.StringToJson($.credentials.SecretsManagerParameters.jobDefinitionVcpus)',
+          'Memory.$': 'States.StringToJson($.credentials.SecretsManagerParameters.jobDefinitionMemory)',
           Volumes: [{
             Host: {
               SourcePath: '/fsx/scratch'
@@ -434,7 +515,7 @@ export class BatchWithLustreStack extends cdk.Stack {
 
     // ジョブステータスの確認を待機
     const waitForJobCompletion = new sfn.Wait(this, 'WaitForJobCompletion', {
-      time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
+      time: sfn.WaitTime.secondsPath('$.credentials.SecretsManagerParameters.waitForJobCompletionSeconds')
     });
 
     // ジョブステータスの確認タスク
@@ -469,7 +550,7 @@ export class BatchWithLustreStack extends cdk.Stack {
 
     // メトリクスチェック後の待機タスク
     const waitForNextCheck = new sfn.Wait(this, 'WaitForNextCheck', {
-      time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
+      time: sfn.WaitTime.secondsPath('$.credentials.SecretsManagerParameters.waitForCheckMetricsSeconds')
     });
 
     // データリポジトリタスクの作成
@@ -510,7 +591,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     });
 
     // 終了ステートの定義
-    const setupComplete = new sfn.Succeed(this, 'SetupComplete');
+    const jobSucceeded = new sfn.Succeed(this, 'JobSucceeded');
     const jobFailed = new sfn.Fail(this, 'JobFailed', {
       cause: 'Batch Job Failed',
       error: 'BatchJobError'
@@ -534,7 +615,6 @@ export class BatchWithLustreStack extends cdk.Stack {
     // ステート遷移はチェーンで定義済み
 
     // autoExportの値に基づいて異なるフローを構築
-    let definition;
     if (autoExport) {
       // メトリクス値による分岐
       const shouldDeleteFSx = new sfn.Choice(this, 'ShouldDeleteFSx')
@@ -546,7 +626,20 @@ export class BatchWithLustreStack extends cdk.Stack {
 
       // ジョブの完了確認
       const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
-        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), checkMetricsTask)
+        .when(
+          sfn.Condition.and(
+            sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'),
+            sfn.Condition.stringEquals('$.credentials.SecretsManagerParameters.deleteLustre', 'true')
+          ),
+          checkMetricsTask
+        )
+        .when(
+          sfn.Condition.and(
+            sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'),
+            sfn.Condition.stringEquals('$.credentials.SecretsManagerParameters.deleteLustre', 'false')
+          ),
+          jobSucceeded
+        )
         .when(
           sfn.Condition.and(
             sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'),
@@ -568,25 +661,60 @@ export class BatchWithLustreStack extends cdk.Stack {
         .next(waitForDataRepositoryTask)
         .next(checkDataRepositoryTasks)
         .next(isDataRepositoryTaskComplete);
-
-      // ジョブの完了確認
-      const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
-        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'), createDataRepositoryTask)
-        .when(
-          sfn.Condition.and(
-            sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'),
-            sfn.Condition.stringMatches('$.jobStatus.Jobs[0].StatusReason', '*Host EC2*')
-          ),
-          waitForJobCompletion
-        )
-        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), jobFailed)
-        .otherwise(waitForJobCompletion);
+// ジョブの完了確認
+const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
+  .when(
+    sfn.Condition.and(
+      sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'),
+      sfn.Condition.stringEquals('$.credentials.SecretsManagerParameters.deleteLustre', 'true')
+    ),
+    createDataRepositoryTask
+  )
+  .when(
+    sfn.Condition.and(
+      sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'),
+      sfn.Condition.stringEquals('$.credentials.SecretsManagerParameters.deleteLustre', 'false')
+    ),
+    jobSucceeded
+  )
+  .when(
+    sfn.Condition.and(
+      sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'),
+      sfn.Condition.stringMatches('$.jobStatus.Jobs[0].StatusReason', '*Host EC2*')
+    ),
+    waitForJobCompletion
+  )
+  .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), jobFailed)
+  .otherwise(waitForJobCompletion);
 
       checkJobStatus.next(isJobComplete);
     }
 
     // 共通のフロー定義
-    definition = createLustreFileSystem
+    let definition;
+    
+    // Secrets Managerから設定値を取得
+    // const getSecret = new tasks.CallAwsService(this, 'GetSecret', {
+    //   service: 'secretsmanager',
+    //   action: 'getSecretValue',
+    //   parameters: {
+    //     SecretId: lustreSecret.secretName
+    //   },
+    //   iamResources: [lustreSecret.secretArn],
+    //   resultPath: '$.secretTemp'
+    // });
+
+    // // 必要なパラメータを抽出
+    // const extractParameters = new sfn.Pass(this, 'ExtractParameters', {
+    //   parameters: {
+    //     'SecretsManagerParameters.$': 'States.StringToJson($.secretTemp.SecretString)'
+    //   },
+    //   resultPath: '$.credentials'
+    // });
+
+    definition = getSecret
+      .next(extractParameters)
+      .next(createLustreFileSystem)
       .next(createDataRepositoryAssociation)
       .next(waitForFileSystem)
       .next(checkFileSystemStatus)
@@ -594,9 +722,9 @@ export class BatchWithLustreStack extends cdk.Stack {
       .next(isFileSystemAndAssociationAvailable);
 
     // 終了フローの設定
-    deleteFSx.next(setupComplete);
+    deleteFSx.next(jobSucceeded);
 
-    new sfn.StateMachine(this, `CreateLustre${context.envName}StateMachine`, {
+    new sfn.StateMachine(this, autoExport ? 'CreateLustreAutoExportStateMachine' : `CreateLustre${envName}StateMachine`, {
       definition,
       role: stepFunctionsRole
     });

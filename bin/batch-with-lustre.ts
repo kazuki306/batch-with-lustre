@@ -5,23 +5,23 @@ import { BatchWithEbsStack } from '../lib/batch-with-ebs-stack';
 
 const app = new cdk.App();
 
-// 環境設定
-const env = {
-  account: process.env.CDK_DEFAULT_ACCOUNT,
-  region: 'ap-northeast-1' // Tokyoリージョンを指定
-};
+// // 環境設定
+// const env = {
+//   account: process.env.CDK_DEFAULT_ACCOUNT,
+//   region: 'ap-northeast-1' // Tokyoリージョンを指定
+// };
 
-// タグの設定
-const tags = {
-  Project: 'BatchWithLustre',
-  Environment: 'Development'
-};
+// // タグの設定
+// const tags = {
+//   Project: 'BatchWithLustre',
+//   Environment: 'Development'
+// };
 
-// 共通のスタックプロパティ
-const commonProps = {
-  env,
-  tags
-};
+// // 共通のスタックプロパティ
+// const commonProps = {
+//   env,
+//   tags
+// };
 
 // cdk.jsonから環境タイプのパラメータを取得
 const type = app.node.tryGetContext('type');
@@ -35,15 +35,18 @@ if (!context) {
 if (type === 'autoExport' || type === 'taskExport') {
   // Lustreスタックを作成
   new BatchWithLustreStack(app, `BatchWithLustre${context.envName}Stack`, {
-    ...commonProps,
+    // ...commonProps,
     description: `Batch with Lustre file system stack (${context.envName})`,
-    autoExport: context.autoExport
+    // autoExport: context.autoExport,
+    // lambdaPeriodSeconds: context.lambdaPeriodSeconds,
+    // lambdaTimeDiffMinutes: context.lambdaTimeDiffMinutes,
+    ...context
   });
 } else if (type === 'onlyEBS') {
   // EBSスタックを作成
   new BatchWithEbsStack(app, `BatchWithEbs${context.envName}Stack`, {
     description: `Batch with EBS volume stack (${context.envName})`,
-    ...commonProps,
+    // ...commonProps,
     ...context
   });
 }

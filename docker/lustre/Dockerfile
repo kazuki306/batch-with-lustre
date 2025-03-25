@@ -43,4 +43,4 @@ COPY lustre/write_delete_test_lustre.sh .
 RUN chmod +x write_delete_test_lustre.sh
 
 # Set default command (デフォルトで10回の書き込み、200GBのファイルサイズ、/scratch ディレクトリ)
-CMD ["./write_delete_test_lustre.sh", "10", "200", "/scratch"]
+CMD ["./write_delete_test_lustre.sh", "5", "10", "/scratch"]

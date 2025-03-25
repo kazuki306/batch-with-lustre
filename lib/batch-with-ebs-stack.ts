@@ -107,27 +107,27 @@ export class BatchWithEbsStack extends cdk.Stack {
     // Type parameter and ECR repository already created above
 
     // Add permissions required for ECR repository custom resource
-    const customResourceRole = new iam.Role(this, 'CustomECRAutoDeleteImagesRole', {
-      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole')
-      ],
-      inlinePolicies: {
-        'ECRPermissions': new iam.PolicyDocument({
-          statements: [
-            new iam.PolicyStatement({
-              effect: iam.Effect.ALLOW,
-              actions: [
-                'ecr:DescribeRepositories',
-                'ecr:ListImages',
-                'ecr:BatchDeleteImage'
-              ],
-              resources: [ecrRepository.repositoryArn]
-            })
-          ]
-        })
-      }
-    });
+    // const customResourceRole = new iam.Role(this, 'CustomECRAutoDeleteImagesRole', {
+    //   assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+    //   managedPolicies: [
+    //     iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole')
+    //   ],
+    //   inlinePolicies: {
+    //     'ECRPermissions': new iam.PolicyDocument({
+    //       statements: [
+    //         new iam.PolicyStatement({
+    //           effect: iam.Effect.ALLOW,
+    //           actions: [
+    //             'ecr:DescribeRepositories',
+    //             'ecr:ListImages',
+    //             'ecr:BatchDeleteImage'
+    //           ],
+    //           resources: [ecrRepository.repositoryArn]
+    //         })
+    //       ]
+    //     })
+    //   }
+    // });
 
     // Security group for Batch
     const batchSecurityGroup = new ec2.SecurityGroup(this, 'BatchSecurityGroup', {
