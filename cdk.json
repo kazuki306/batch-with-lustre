@@ -96,7 +96,7 @@
       "jobDefinitionMemory": 30000,
       "waitForLustreCreationSeconds": 30,
       "waitForJobCompletionSeconds": 300,
-      "waitForCheckMetricsSeconds": 10,
+      "waitForCheckMetricsSeconds": 60,
       "lambdaPeriodSeconds": 60,
       "lambdaTimeDiffMinutes": 15
     },

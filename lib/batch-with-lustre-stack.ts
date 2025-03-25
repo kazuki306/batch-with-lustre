@@ -29,6 +29,7 @@ interface BatchWithLustreStackProps extends cdk.StackProps {
   waitForLustreCreationSeconds?: number;
   waitForJobCompletionSeconds?: number;
   waitForCheckMetricsSeconds?: number;
+  waitForDataRepositoryTaskSeconds?: number;
   deleteLustre?: boolean;
   lambdaPeriodSeconds?: number;
   lambdaTimeDiffMinutes?: number;
@@ -56,6 +57,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     const waitForLustreCreationSeconds = props?.waitForLustreCreationSeconds ?? 30;
     const waitForJobCompletionSeconds = props?.waitForJobCompletionSeconds ?? 300;
     const waitForCheckMetricsSeconds = props?.waitForCheckMetricsSeconds ?? 10;
+    const waitForDataRepositoryTaskSeconds = props?.waitForDataRepositoryTaskSeconds ?? 300;
     const deleteLustre = props?.deleteLustre ?? true;
 
     // ECRリポジトリの作成
@@ -69,21 +71,30 @@ export class BatchWithLustreStack extends cdk.Stack {
     const containerImageUri = `${this.account}.dkr.ecr.${this.region}.amazonaws.com/${ecrRepositoryName}:latest`;
 
     // Secrets Managerに設定値を格納
-    const lustreSecret = new secretsmanager.Secret(this, 'BatchWithLustreAutoExportSecret', {
-      description: 'Configuration values for executing AWS Batch jobs with FSx for Lustre and StepFunction',
-      secretObjectValue: {
-        lustreStorageCapacity: cdk.SecretValue.unsafePlainText(lustreStorageCapacity.toString()),
-        lustreFileSystemTypeVersion: cdk.SecretValue.unsafePlainText(lustreFileSystemTypeVersion),
-        lustreImportedFileChunkSize: cdk.SecretValue.unsafePlainText(lustreImportedFileChunkSize.toString()),
-        jobDefinitionRetryAttempts: cdk.SecretValue.unsafePlainText(jobDefinitionRetryAttempts.toString()),
-        jobDefinitionVcpus: cdk.SecretValue.unsafePlainText(jobDefinitionVcpus.toString()),
-        jobDefinitionMemory: cdk.SecretValue.unsafePlainText(jobDefinitionMemory.toString()),
-        jobDefinitionContainerImage: cdk.SecretValue.unsafePlainText(containerImageUri),
-        waitForLustreCreationSeconds: cdk.SecretValue.unsafePlainText(waitForLustreCreationSeconds.toString()),
-        waitForJobCompletionSeconds: cdk.SecretValue.unsafePlainText(waitForJobCompletionSeconds.toString()),
-        waitForCheckMetricsSeconds: cdk.SecretValue.unsafePlainText(waitForCheckMetricsSeconds.toString()),
-        deleteLustre: cdk.SecretValue.unsafePlainText(deleteLustre.toString()),
-      },
+    // autoExportの値に基づいて異なるシークレットを作成
+    const secretObjectValue: Record<string, cdk.SecretValue> = {
+      lustreStorageCapacity: cdk.SecretValue.unsafePlainText(lustreStorageCapacity.toString()),
+      lustreFileSystemTypeVersion: cdk.SecretValue.unsafePlainText(lustreFileSystemTypeVersion),
+      lustreImportedFileChunkSize: cdk.SecretValue.unsafePlainText(lustreImportedFileChunkSize.toString()),
+      jobDefinitionRetryAttempts: cdk.SecretValue.unsafePlainText(jobDefinitionRetryAttempts.toString()),
+      jobDefinitionVcpus: cdk.SecretValue.unsafePlainText(jobDefinitionVcpus.toString()),
+      jobDefinitionMemory: cdk.SecretValue.unsafePlainText(jobDefinitionMemory.toString()),
+      jobDefinitionContainerImage: cdk.SecretValue.unsafePlainText(containerImageUri),
+      waitForLustreCreationSeconds: cdk.SecretValue.unsafePlainText(waitForLustreCreationSeconds.toString()),
+      waitForJobCompletionSeconds: cdk.SecretValue.unsafePlainText(waitForJobCompletionSeconds.toString()),
+      deleteLustre: cdk.SecretValue.unsafePlainText(deleteLustre.toString()),
+    };
+
+    // autoExportの値に基づいて異なるパラメータを設定
+    if (autoExport) {
+      secretObjectValue.waitForCheckMetricsSeconds = cdk.SecretValue.unsafePlainText(waitForCheckMetricsSeconds.toString());
+    } else {
+      secretObjectValue.waitForDataRepositoryTaskSeconds = cdk.SecretValue.unsafePlainText(waitForDataRepositoryTaskSeconds.toString());
+    }
+
+    const lustreSecret = new secretsmanager.Secret(this, autoExport ? 'BatchWithLustreAutoExportSecret' : 'BatchWithLustreTaskExportSecret', {
+      description: `Configuration values for executing AWS Batch jobs with FSx for Lustre and StepFunction (${autoExport ? 'AutoExport' : 'TaskExport'})`,
+      secretObjectValue,
     });
 
     const vpc = new ec2.Vpc(this, 'BatchVPC', {
@@ -587,7 +598,7 @@ export class BatchWithLustreStack extends cdk.Stack {
 
     // データリポジトリタスクの完了を待機
     const waitForDataRepositoryTask = new sfn.Wait(this, 'WaitForDataRepositoryTask', {
-      time: sfn.WaitTime.duration(cdk.Duration.minutes(5))
+      time: sfn.WaitTime.secondsPath('$.credentials.SecretsManagerParameters.waitForDataRepositoryTaskSeconds')
     });
 
     // 終了ステートの定義
@@ -654,38 +665,39 @@ export class BatchWithLustreStack extends cdk.Stack {
     } else {
       // データリポジトリタスクの完了確認
       const isDataRepositoryTaskComplete = new sfn.Choice(this, 'IsDataRepositoryTaskComplete')
-        .when(sfn.Condition.stringEquals('$.dataRepositoryTasks.DataRepositoryTasks[0].Lifecycle', 'SUCCEEDED'),deleteFSx)
+        .when(sfn.Condition.stringEquals('$.dataRepositoryTasks.DataRepositoryTasks[0].Lifecycle', 'SUCCEEDED'), deleteFSx)
         .otherwise(waitForDataRepositoryTask);
 
       createDataRepositoryTask
         .next(waitForDataRepositoryTask)
         .next(checkDataRepositoryTasks)
         .next(isDataRepositoryTaskComplete);
-// ジョブの完了確認
-const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
-  .when(
-    sfn.Condition.and(
-      sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'),
-      sfn.Condition.stringEquals('$.credentials.SecretsManagerParameters.deleteLustre', 'true')
-    ),
-    createDataRepositoryTask
-  )
-  .when(
-    sfn.Condition.and(
-      sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'),
-      sfn.Condition.stringEquals('$.credentials.SecretsManagerParameters.deleteLustre', 'false')
-    ),
-    jobSucceeded
-  )
-  .when(
-    sfn.Condition.and(
-      sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'),
-      sfn.Condition.stringMatches('$.jobStatus.Jobs[0].StatusReason', '*Host EC2*')
-    ),
-    waitForJobCompletion
-  )
-  .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), jobFailed)
-  .otherwise(waitForJobCompletion);
+
+      // ジョブの完了確認
+      const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
+        .when(
+          sfn.Condition.and(
+            sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'),
+            sfn.Condition.stringEquals('$.credentials.SecretsManagerParameters.deleteLustre', 'true')
+          ),
+          createDataRepositoryTask
+        )
+        .when(
+          sfn.Condition.and(
+            sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'SUCCEEDED'),
+            sfn.Condition.stringEquals('$.credentials.SecretsManagerParameters.deleteLustre', 'false')
+          ),
+          jobSucceeded
+        )
+        .when(
+          sfn.Condition.and(
+            sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'),
+            sfn.Condition.stringMatches('$.jobStatus.Jobs[0].StatusReason', '*Host EC2*')
+          ),
+          waitForJobCompletion
+        )
+        .when(sfn.Condition.stringEquals('$.jobStatus.Jobs[0].Status', 'FAILED'), jobFailed)
+        .otherwise(waitForJobCompletion);
 
       checkJobStatus.next(isJobComplete);
     }
@@ -724,7 +736,15 @@ const isJobComplete = new sfn.Choice(this, 'IsJobComplete')
     // 終了フローの設定
     deleteFSx.next(jobSucceeded);
 
-    new sfn.StateMachine(this, autoExport ? 'CreateLustreAutoExportStateMachine' : `CreateLustre${envName}StateMachine`, {
+    // StateMachine名の決定
+    let stateMachineName: string;
+    if (autoExport) {
+      stateMachineName = 'CreateLustreAutoExportStateMachine';
+    } else {
+      stateMachineName = 'CreateLustreTaskExportStateMachine';
+    }
+
+    new sfn.StateMachine(this, stateMachineName, {
       definition,
       role: stepFunctionsRole
     });
