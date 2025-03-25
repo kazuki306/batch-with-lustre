@@ -49,7 +49,7 @@ export const handler = async (event: CheckMetricsEvent): Promise<CheckMetricsRes
 
     // メトリクスの値を確認
     if (!response.MetricDataResults || response.MetricDataResults.length === 0) {
-      console.warn('メトリクスの結果が取得できませんでした');
+      console.warn('Could not retrieve metric results');
       return {
         shouldDeleteFSx: false,
         metricsValue: null
@@ -59,7 +59,7 @@ export const handler = async (event: CheckMetricsEvent): Promise<CheckMetricsRes
     const metricResult = response.MetricDataResults[0];
     
     if (!metricResult.Values || metricResult.Values.length === 0) {
-      console.warn('メトリクスの値が取得できませんでした');
+      console.warn('Could not retrieve metric values');
       return {
         shouldDeleteFSx: false,
         metricsValue: null
@@ -75,7 +75,7 @@ export const handler = async (event: CheckMetricsEvent): Promise<CheckMetricsRes
       metricsValue: latestValue
     };
   } catch (error) {
-    console.error('CloudWatchメトリクスの取得中にエラーが発生しました:', error);
+    console.error('Error occurred while retrieving CloudWatch metrics:', error);
     throw error;
   }
 };
