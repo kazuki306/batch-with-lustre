@@ -55,19 +55,19 @@ SPOTインスタンスは中断される可能性があるため、以下の点�
 
 ### Auto Export モード
 
-![Auto Export モードのアーキテクチャ](docs/img/architecture/auto_export_archi.png)
+<img src="docs/img/architecture/auto_export_archi.png" alt="Auto Export モードのアーキテクチャ" width="500" />
 
 Auto Export モードでは、FSx for Lustreファイルシステム上での変更が自動的にS3バケットに反映されます。リアルタイムデータ処理や継続的なデータ生成シナリオに最適です。CloudWatchメトリクスを監視してエクスポート完了を確認し、すべてのデータがS3に同期された後にリソースをクリーンアップします。
 
 ### Task Export モード
 
-![Task Export モードのアーキテクチャ](docs/img/architecture/task_export_archi.png)
+<img src="docs/img/architecture/task_export_archi.png" alt="Task Export モードのアーキテクチャ" width="500" />
 
 Task Export モードでは、ジョブ完了後に明示的なデータリポジトリタスクを実行してS3へのエクスポートを行います。バッチ処理や大規模データセットの処理に最適で、ジョブ実行中のエクスポートによるオーバーヘッドを避けることができます。
 
 ### Only EBS モード
 
-![Only EBS モードのアーキテクチャ](docs/img/architecture/only_ebs_archi.png)
+<img src="docs/img/architecture/only_ebs_archi.png" alt="Only EBS モードのアーキテクチャ" width="500" />
 
 Only EBS モードでは、高性能なEBSボリュームを使用してシングルノードでの処理を最適化します。共有ファイルシステムが不要な場合や、コスト効率を重視する場合に適しています。S3との連携も可能ですが、手動またはスクリプトを通じて行う必要があります。
 

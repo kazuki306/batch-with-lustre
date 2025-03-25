@@ -8,7 +8,7 @@ Only EBS モードは、AWS BatchとAmazon EBS（Elastic Block Store）を組み
 
 ## アーキテクチャ
 
-![Only EBS モードのアーキテクチャ](img/architecture/only_ebs_archi.png)
+<img src="img/architecture/only_ebs_archi.png" alt="Only EBS モードのアーキテクチャ" width="600" />
 
 Only EBS モードでは、AWS BatchとAmazon EBSを組み合わせたシンプルで効率的なアーキテクチャを採用しています。このアーキテクチャでは、高性能なEBSボリュームがBatchジョブを実行するEC2インスタンスに直接アタッチされ、単一インスタンスでの高速なデータ処理を実現します。Step Functionsがボリュームのライフサイクル管理を自動化し、ジョブ完了後のリソースクリーンアップを行います。
 
@@ -64,7 +64,7 @@ Only EBSモードでは、Step Functionsワークフローが以下のEBS関連�
 
 ## Step Functions ワークフロー
 
-![Only EBS モードのStep Functionsワークフロー](img/sfn_workflow/sfn_ebs.png)
+<img src="img/sfn_workflow/sfn_ebs.png" alt="Only EBS モードのStep Functionsワークフロー" width="600" />
 
 Only EBS モードのStep Functionsワークフローは以下のステップで構成されています：
 
