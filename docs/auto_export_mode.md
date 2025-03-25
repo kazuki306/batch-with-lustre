@@ -66,19 +66,48 @@ Lambda関数が定期的にCloudWatchメトリクスをチェックし、エク�
 
 ## Step Functions ワークフロー
 
+![Auto Export モードのStep Functionsワークフロー](img/sfn_lustre_auto_export.png)
+
 Auto Export モードのStep Functionsワークフローは以下のステップで構成されています：
 
-1. **Secrets Managerからパラメータ取得**
-2. **FSx for Lustreファイルシステム作成**
-3. **S3バケットとのデータリポジトリ関連付け作成**
-4. **ファイルシステムの可用性確認**
-5. **EC2起動テンプレート作成**
-6. **Batchコンピューティング環境更新**
-7. **ジョブ定義登録**
-8. **ジョブ送信**
-9. **ジョブ完了確認**
-10. **CloudWatchメトリクスチェック**
-11. **ファイルシステム削除（オプション）**
+1. **Secrets Managerからパラメータ取得** (GetSecret → ExtractParameters)
+   - 設定パラメータをSecrets Managerから取得し、後続のステップで使用
+
+2. **FSx for Lustreファイルシステム作成** (CreateLustreFileSystem)
+   - 指定されたパラメータ（ストレージ容量、バージョンなど）でLustreファイルシステムを作成
+
+3. **S3バケットとのデータリポジトリ関連付け作成** (CreateDataRepositoryAssociation)
+   - LustreファイルシステムとS3バケットを関連付け、自動インポート/エクスポート設定を構成
+
+4. **ファイルシステムの可用性確認** (WaitForFileSystem → CheckFileSystemStatus → CheckDataRepositoryAssociation → IsFileSystemAndAssociationAvailable)
+   - ファイルシステムとデータリポジトリ関連付けが利用可能になるまで待機
+   - 利用可能でない場合は待機を継続
+
+5. **EC2起動テンプレート作成** (CreateLaunchTemplate)
+   - Lustreファイルシステムをマウントするためのユーザーデータスクリプトを含む起動テンプレートを作成
+
+6. **Batchコンピューティング環境更新** (UpdateComputeEnvironment)
+   - 作成した起動テンプレートを使用するようにBatchコンピューティング環境を更新
+
+7. **ジョブ定義登録** (CreateJobDefinition)
+   - Lustreファイルシステムをマウントするコンテナ設定を含むジョブ定義を作成
+
+8. **ジョブ送信** (SubmitJob)
+   - 作成したジョブ定義を使用してBatchジョブをキューに送信
+
+9. **ジョブ完了確認** (WaitForJobCompletion → CheckJobStatus → IsJobComplete)
+   - ジョブの完了を待機し、ステータスを確認
+   - 失敗した場合はエラー処理を実行
+   - Host EC2エラーの場合は再試行
+
+10. **CloudWatchメトリクスチェック** (CheckMetrics → ShouldDeleteFSx)
+    - AgeOfOldestQueuedMessageメトリクスを確認し、すべてのエクスポートが完了したかを判断
+    - 完了していない場合は待機して再チェック
+
+11. **ファイルシステム削除（オプション）** (DeleteFSx)
+    - deleteLustreフラグがtrueで、すべてのエクスポートが完了した場合にファイルシステムを削除
+
+このワークフローの特徴は、ジョブ完了後にCloudWatchメトリクスを使用してエクスポートの完了を確認し、すべてのデータがS3に同期された後にのみLustreファイルシステムを削除する点です。これにより、データ損失のリスクを最小限に抑えつつ、不要なリソースを自動的にクリーンアップします。
 
 ## ユースケース
 

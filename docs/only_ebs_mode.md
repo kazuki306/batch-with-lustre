@@ -62,18 +62,49 @@ Only EBSモードでは、Step Functionsワークフローが以下のEBS関連�
 
 ## Step Functions ワークフロー
 
+![Only EBS モードのStep Functionsワークフロー](img/sfn_ebs.png)
+
 Only EBS モードのStep Functionsワークフローは以下のステップで構成されています：
 
-1. **Secrets Managerからパラメータ取得**
-2. **EBSボリューム作成**
-3. **ボリュームの可用性確認**
-4. **EC2起動テンプレート作成**
-5. **Batchコンピューティング環境更新**
-6. **ジョブ定義登録**
-7. **ジョブ送信**
-8. **ジョブ完了確認**
-9. **EBSボリュームデタッチ（deleteEbs=trueの場合）**
-10. **EBSボリューム削除（deleteEbs=trueの場合）**
+1. **Secrets Managerからパラメータ取得** (GetSecret → ExtractParameters)
+   - 設定パラメータをSecrets Managerから取得し、後続のステップで使用
+
+2. **EBSボリューム作成** (CreateEbs)
+   - 指定されたパラメータ（サイズ、IOPS、スループットなど）でEBSボリュームを作成
+   - gp3タイプのボリュームを使用
+
+3. **ボリュームの可用性確認** (WaitForEbsCreation → CheckEbsStatus → IsEbsAvailable)
+   - EBSボリュームが利用可能になるまで待機
+   - 利用可能でない場合は待機を継続
+
+4. **EC2起動テンプレート作成** (CreateLaunchTemplate)
+   - EBSボリュームをアタッチするためのユーザーデータスクリプトを含む起動テンプレートを作成
+   - スクリプトには、ボリュームのマウント、フォーマット（必要な場合）、使用中チェックなどの処理が含まれる
+
+5. **Batchコンピューティング環境更新** (UpdateComputeEnvironment)
+   - 作成した起動テンプレートを使用するようにBatchコンピューティング環境を更新
+
+6. **ジョブ定義登録** (CreateJobDefinition)
+   - EBSボリュームをマウントするコンテナ設定を含むジョブ定義を作成
+   - /dataディレクトリをコンテナにマウント
+
+7. **ジョブ送信** (SubmitJob)
+   - 作成したジョブ定義を使用してBatchジョブをキューに送信
+
+8. **ジョブ完了確認** (WaitForJobCompletion → CheckJobStatus → IsJobComplete)
+   - ジョブの完了を待機し、ステータスを確認
+   - 失敗した場合はエラー処理を実行
+   - Host EC2エラーの場合は再試行
+
+9. **EBSボリュームデタッチ（deleteEbs=trueの場合）** (DetachEbsVolume)
+   - deleteEbsフラグがtrueの場合、ボリュームをインスタンスからデタッチ
+   - エラーが発生しても処理を継続（addCatch設定）
+
+10. **EBSボリューム削除（deleteEbs=trueの場合）** (WaitAfterDetach → DeleteEbsVolume)
+    - デタッチ後に短時間待機してからボリュームを削除
+    - deleteEbsフラグがfalseの場合はこのステップをスキップし、ボリュームを保持
+
+このワークフローの特徴は、Lustreモードと比較してシンプルな構造であることです。単一のEBSボリュームを作成し、Batchジョブで使用した後、オプションでクリーンアップするという直接的なフローになっています。また、ボリュームが使用中の場合（他のインスタンスにアタッチされている場合）は、ユーザーデータスクリプトによってインスタンスを自動的に終了させる安全機構が組み込まれています。
 
 ## Lustre モードとの違い
 

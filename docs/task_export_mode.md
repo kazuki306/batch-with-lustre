@@ -65,20 +65,53 @@ S3からLustreへの自動インポートは引き続き有効です：
 
 ## Step Functions ワークフロー
 
+![Task Export モードのStep Functionsワークフロー](img/sfn_lustre_task_export.png)
+
 Task Export モードのStep Functionsワークフローは以下のステップで構成されています：
 
-1. **Secrets Managerからパラメータ取得**
-2. **FSx for Lustreファイルシステム作成**
-3. **S3バケットとのデータリポジトリ関連付け作成**
-4. **ファイルシステムの可用性確認**
-5. **EC2起動テンプレート作成**
-6. **Batchコンピューティング環境更新**
-7. **ジョブ定義登録**
-8. **ジョブ送信**
-9. **ジョブ完了確認**
-10. **データリポジトリタスク作成（EXPORT_TO_REPOSITORY）**
-11. **データリポジトリタスク完了確認**
-12. **ファイルシステム削除（オプション）**
+1. **Secrets Managerからパラメータ取得** (GetSecret → ExtractParameters)
+   - 設定パラメータをSecrets Managerから取得し、後続のステップで使用
+
+2. **FSx for Lustreファイルシステム作成** (CreateLustreFileSystem)
+   - 指定されたパラメータでLustreファイルシステムを作成
+   - Auto Exportモードとは異なり、自動エクスポート機能は無効
+
+3. **S3バケットとのデータリポジトリ関連付け作成** (CreateDataRepositoryAssociation)
+   - LustreファイルシステムとS3バケットを関連付け、自動インポートのみを設定
+
+4. **ファイルシステムの可用性確認** (WaitForFileSystem → CheckFileSystemStatus → CheckDataRepositoryAssociation → IsFileSystemAndAssociationAvailable)
+   - ファイルシステムとデータリポジトリ関連付けが利用可能になるまで待機
+   - 利用可能でない場合は待機を継続
+
+5. **EC2起動テンプレート作成** (CreateLaunchTemplate)
+   - Lustreファイルシステムをマウントするためのユーザーデータスクリプトを含む起動テンプレートを作成
+
+6. **Batchコンピューティング環境更新** (UpdateComputeEnvironment)
+   - 作成した起動テンプレートを使用するようにBatchコンピューティング環境を更新
+
+7. **ジョブ定義登録** (CreateJobDefinition)
+   - Lustreファイルシステムをマウントするコンテナ設定を含むジョブ定義を作成
+
+8. **ジョブ送信** (SubmitJob)
+   - 作成したジョブ定義を使用してBatchジョブをキューに送信
+
+9. **ジョブ完了確認** (WaitForJobCompletion → CheckJobStatus → IsJobComplete)
+   - ジョブの完了を待機し、ステータスを確認
+   - 失敗した場合はエラー処理を実行
+   - Host EC2エラーの場合は再試行
+
+10. **データリポジトリタスク作成（EXPORT_TO_REPOSITORY）** (CreateDataRepositoryTask)
+    - ジョブが成功した場合、明示的なエクスポートタスクを作成
+    - 指定したパス（/scratch）のデータをS3バケットにエクスポート
+
+11. **データリポジトリタスク完了確認** (WaitForDataRepositoryTask → CheckDataRepositoryTasks → IsDataRepositoryTaskComplete)
+    - エクスポートタスクの完了を待機し、ステータスを確認
+    - 完了していない場合は待機を継続
+
+12. **ファイルシステム削除（オプション）** (DeleteFSx)
+    - deleteLustreフラグがtrueで、エクスポートタスクが完了した場合にファイルシステムを削除
+
+このワークフローの特徴は、Auto Exportモードとは異なり、ジョブ完了後に明示的なデータリポジトリタスクを作成してS3へのエクスポートを行う点です。これにより、ジョブ実行中はエクスポート処理によるオーバーヘッドを避けつつ、ジョブ完了後に確実にデータをS3に保存することができます。また、エクスポートタスクの完了を確認してからファイルシステムを削除するため、データ損失のリスクを最小限に抑えることができます。
 
 ## Auto Export モードとの違い
 
