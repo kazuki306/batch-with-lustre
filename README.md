@@ -163,12 +163,12 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 - Lustre Auto Export：**batch-job-with-lustre-auto-export**
 - EBS：**batch-job-with-ebs**
 
-2. StepFunction を実行します。使用するモードに合わせてそれぞれ以下の名前から始まる StepFunctionが作成されています：
+2. Step Functions を実行します。使用するモードに合わせてそれぞれ以下の名前から始まる Step Functions が作成されています：
 - Lustre Task Export：__CreateLustreTaskExportStateMachine*__
 - Lustre Auto Export：__CreateLustreAutoExportStateMachine*__
 - EBS：__BatchJobWithEbsStateMachine*__
 
-入力は何も入れず、「Start Execution」ボタンを押すことで Step Function が実行されます。
+入力は何も入れず、「Start Execution」ボタンを押すことで Step Functions が実行されます。
 
 <img src="docs/img/test_sample_job/execute_sfn.png" alt="Step Function実行画面"/>
 
