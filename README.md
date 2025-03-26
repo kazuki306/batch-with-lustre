@@ -175,7 +175,7 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 3. パラメータを変更したい場合は、Step Functions の実行前に Secrets Manager の値を変更することで実現できます。使用するモードに合わせてそれぞれ以下の名前から始まる Secrets Manager のシークレットが作成されています：
 - Lustre Task Export：__BatchJobWithTaskExport*__
 - Lustre Auto Export：__BatchJobWithAutoExport*__
-- EBS：__BatchJobWithOnlyEbsSecret*__
+- EBS：__BatchJobWithOnlyEbs*__
 
 <img src="docs/img/test_sample_job/edit_secrets.png" alt="Secrets Manager編集画面"/>
 
