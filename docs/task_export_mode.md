@@ -60,7 +60,7 @@ S3からLustreへの自動インポートは引き続き有効です：
 
 ### cdk.json と Secrets Manager の両方で変更可能なパラメータ
 
-以下のパラメータは `cdk.json` での初期設定後、Secrets Manager で実行時に変更することも可能です：
+以下のパラメータは `cdk.json` での初期設定後、Secrets Manager から Step Functions 実行前に変更することも可能です：
 
 | パラメータ | 説明 | デフォルト値 |
 |------------|------|------------|

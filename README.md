@@ -162,21 +162,15 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 
 <img src="docs/img/test_sample_job/edit_secrets.png" alt="Secrets Manager編集画面"/>
 
-変更できるパラメータはそれぞれのタイプにおける詳細ドキュメントを参照してください：
-- [Lustre Task Export モード](docs/task_export_mode.md)
-- [Lustre Auto Export モード](docs/auto_export_mode.md)
-- [EBS モード](docs/only_ebs_mode.md)
+## パラメータのカスタマイズ
 
-<!-- ## カスタマイズ
-
-`cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます：
+`cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます。以下はその一例です：
 
 ### ストレージ設定
 
 - **FSx for Lustre**:
-  - `lustreStorageCapacity`: ストレージ容量（GB）
   - `lustreFileSystemTypeVersion`: Lustreバージョン
-  - `lustreImportedFileChunkSize`: インポートチャンクサイズ（MB）
+  - `lustreStorageCapacity`: ストレージ容量（GB）
 
 - **EBS**:
   - `ebsSizeGb`: EBSボリュームサイズ（GB）
@@ -198,7 +192,13 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
   - `jobDefinitionVcpus`: ジョブあたりのvCPU数
   - `jobDefinitionMemory`: ジョブあたりのメモリ（MB）
 
-## Step Functionsによるオーケストレーション
+変更できるパラメータの詳細はそれぞれのタイプにおけるドキュメントを参照してください：
+- [Lustre Task Export モード](docs/task_export_mode.md)
+- [Lustre Auto Export モード](docs/auto_export_mode.md)
+- [EBS モード](docs/only_ebs_mode.md)
+
+
+<!-- ## Step Functionsによるオーケストレーション
 
 このプロジェクトでは、AWS Step Functionsを使用して以下のワークフローを自動化しています：
 
