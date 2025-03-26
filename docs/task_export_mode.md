@@ -8,9 +8,9 @@ Lustre Task Export モードは、AWS BatchとAmazon FSx for Lustreを組み合�
 
 ## アーキテクチャ
 
-<img src="img/architecture/task_export_archi.png" alt="Lustre Task Export モードのアーキテクチャ" width="600" />
-
 Lustre Task Export モードでは、AWS BatchとFSx for Lustreを組み合わせ、明示的なデータリポジトリタスクを使用したアーキテクチャを採用しています。このアーキテクチャでは、S3からLustreへのデータインポートは自動的に行われますが、Lustreから S3へのエクスポートはジョブ完了後に明示的なタスクとして実行されます。これにより、ジョブ実行中のオーバーヘッドを抑えつつ、処理結果を確実にS3に保存することができます。
+
+<img src="img/architecture/task_export_archi.png" alt="Lustre Task Export モードのアーキテクチャ" width="600" />
 
 ### SPOT インスタンス中断時の動作
 

@@ -8,9 +8,9 @@ EBS モードは、AWS BatchとAmazon EBS（Elastic Block Store）を組み合�
 
 ## アーキテクチャ
 
-<img src="img/architecture/only_ebs_archi.png" alt="EBS モードのアーキテクチャ" width="600" />
-
 EBS モードでは、AWS BatchとAmazon EBSを組み合わせたシンプルで効率的なアーキテクチャを採用しています。このアーキテクチャでは、EBSボリュームがBatchジョブを実行するEC2インスタンスに直接アタッチされ、単一インスタンスでの高速なデータ処理を実現します。
+
+<img src="img/architecture/only_ebs_archi.png" alt="EBS モードのアーキテクチャ" width="600" />
 
 ### SPOT インスタンス中断時の動作
 
