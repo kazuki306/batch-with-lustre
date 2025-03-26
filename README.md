@@ -45,7 +45,7 @@ Lustre Task Export モードでは、ジョブ完了後に明示的な[データ
 <img src="docs/img/architecture/task_export_archi.png" alt="Task Export モードのアーキテクチャ" width="500" />
 
 ### Lustre Auto Export モード
-Lustre Auto Export モードでは、Lustreファイルシステム上での変更が自動的にS3バケットに反映されます。バッチジョブ中のデータを同期的にS3にエクスポートしたい場合に最適です。。CloudWatchメトリクスを監視してエクスポート完了を確認し、すべてのデータがS3に同期された後にリソースをクリーンアップします。 ([詳細](docs/auto_export_mode.md))
+Lustre Auto Export モードでは、Lustreファイルシステム上での変更が自動的にS3バケットに反映されます。バッチジョブ中のデータを同期的にS3にエクスポートしたい場合に最適です。CloudWatchメトリクスを監視してエクスポート完了を確認し、すべてのデータがS3に同期された後にリソースをクリーンアップします。 ([詳細](docs/auto_export_mode.md))
 
 <img src="docs/img/architecture/auto_export_archi.png" alt="Auto Export モードのアーキテクチャ" width="500" />
 
@@ -118,22 +118,38 @@ npx cdk bootstrap
 
 デプロイモードを指定してCDKスタックをデプロイします：
 
-### Lustre Task Export
+### Lustre Task Export モード
 ```
 npx cdk deploy -c type=taskExport
 ```
 
-### Lustre Auto Export
+### Lustre Auto Export モード
 ```
 npx cdk deploy -c type=autoExport
 ```
 
-### EBS
+### EBS モード
 ```
 npx cdk deploy -c type=onlyEBS
 ```
 
 ## サンプルジョブによるテスト
+
+### サンプルジョブの概要
+
+このプロジェクトには、ストレージパフォーマンスをテストするためのサンプルジョブが含まれています：
+
+- **概要**: 指定された回数、指定されたサイズのファイルを順番に作成するジョブ。既に中間ファイルが存在する場合はそこまでの処理をスキップする
+
+**デフォルト設定**:
+- **Lustreモード**: Lustre がマウントされた /scratch ディレクトリに対して、 100 GB のデータを 10 回書き込む
+- **EBSモード**: EBS がマウントされた /data ディレクトリに対して、 100 GB のデータを 10 回書き込む
+
+詳細な実装については、以下のファイルを参照してください：
+- Lustreモード: `/docker/lustre/Dockerfile` および `/docker/lustre/write_delete_test_lustre.sh`
+- EBSモード: `/docker/ebs/Dockerfile` および `/docker/ebs/write_delete_test_ebs_with_s3.sh`
+
+### テスト手順
 
 以下の手順でサンプルジョブをテストできます：
 
