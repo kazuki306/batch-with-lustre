@@ -172,7 +172,7 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 
 <img src="docs/img/test_sample_job/execute_sfn.png" alt="Step Function実行画面"/>
 
-3. パラメータを変更したい場合は、Secrets Manager から変更が可能です。使用するモードに合わせてそれぞれ以下の名前から始まる Secrets Manager のシークレットが作成されています：
+3. パラメータを変更したい場合は、Step Functions の実行前に Secrets Manager の値を変更することで実現できます。使用するモードに合わせてそれぞれ以下の名前から始まる Secrets Manager のシークレットが作成されています：
 - Lustre Task Export：__BatchWithLustreTaskExport*__
 - Lustre Auto Export：__BatchWithLustreAutoExport*__
 - EBS：__BatchWithEbsSecret*__
@@ -181,7 +181,8 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 
 ## パラメータのカスタマイズ
 
-`cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます。一部のパラメータについては、`cdk.json` での初期設定後、Secrets Manager から Step Functions 実行前に変更することも可能です：
+<!-- `cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます。一部のパラメータについては、`cdk.json` での初期設定後、Secrets Manager から Step Functions 実行前に変更することも可能です： -->
+Secrets Manager から変更可能な主なパラメータは以下の通りです：
 
 ### ストレージ設定
 
@@ -196,13 +197,13 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 
 ### AWS Batch 設定
 
-- **コンピューティング環境**:
+<!-- - **コンピューティング環境**:
   - `computeEnvironmentType`: コンピューティング環境タイプ。'SPOT'または'EC2'を選択可能。コスト効率を重視する場合は'SPOT'を推奨。
   - `computeEnvironmentAllocationStrategy`: 割り当て戦略。デフォルトでは'SPOT_PRICE_CAPACITY_OPTIMIZED'に設定されており、SPOTインスタンスの中断リスクを最小化します。詳細は[AWS Batchのドキュメント](https://docs.aws.amazon.com/batch/latest/userguide/allocation-strategies.html)を参照してください。
   - `computeEnvironmentInstanceTypes`: 使用するインスタンスタイプ。デフォルトでは["optimal"]に設定されていますが、特定のインスタンスタイプを指定することも可能です。例: ["c4.4xlarge", "m4.4xlarge", "c4.8xlarge"]
   - `computeEnvironmentMinvCpus`: 最小vCPU数
   - `computeEnvironmentMaxvCpus`: 最大vCPU数
-  - `computeEnvironmentDesiredvCpus`: 希望vCPU数
+  - `computeEnvironmentDesiredvCpus`: 希望vCPU数 -->
 
 - **ジョブ定義**:
   - `jobDefinitionRetryAttempts`: ジョブ再試行回数
