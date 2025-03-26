@@ -83,9 +83,9 @@ EBS モードでは、EBSボリュームを使用してシングルノードで�
 
 このプロジェクトは3つのデプロイモードをサポートしています：
 
-1. **Lustre Task Export**: FSx for Lustreを使用し、明示的なエクスポートタスクを実行 ([詳細](docs/task_export_mode.md))
-2. **Lustre Auto Export**: FSx for Lustreを使用し、変更を自動的にS3にエクスポート ([詳細](docs/auto_export_mode.md))
-3. **EBS**: EBSボリュームのみを使用 ([詳細](docs/only_ebs_mode.md))
+1. [**Lustre Task Export**](docs/task_export_mode.md): FSx for Lustreを使用し、明示的なエクスポートタスクを実行
+2. [**Lustre Auto Export**](docs/auto_export_mode.md): FSx for Lustreを使用し、変更を自動的にS3にエクスポート
+3. [**EBS**](docs/only_ebs_mode.md): EBSボリュームのみを使用
 
 各モードの詳細な説明とパラメータについては、リンク先のドキュメントを参照してください。
 
