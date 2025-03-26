@@ -49,7 +49,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     const jobDefinitionMemory = props?.jobDefinitionMemory ?? 30000;
     const ecrRepositoryName = props?.ecrRepositoryName ?? 'batch-job-with-lustre-auto-export';
     const computeEnvironmentType = props?.computeEnvironmentType ?? 'SPOT';
-    const computeEnvironmentAllocationStrategy = props?.computeEnvironmentAllocationStrategy ?? 'BEST_FIT_PROGRESSIVE';
+    const computeEnvironmentAllocationStrategy = props?.computeEnvironmentAllocationStrategy ?? 'SPOT_PRICE_CAPACITY_OPTIMIZED';
     const computeEnvironmentMaxvCpus = props?.computeEnvironmentMaxvCpus ?? 256;
     const computeEnvironmentMinvCpus = props?.computeEnvironmentMinvCpus ?? 0;
     const computeEnvironmentDesiredvCpus = props?.computeEnvironmentDesiredvCpus ?? 0;

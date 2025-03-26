@@ -54,7 +54,7 @@ EBSモードでは、Step Functionsワークフローが以下のEBS関連タス
 | envName | 環境名 | "OnlyEBS" |
 | ecrRepositoryName | ECRリポジトリ名 | "batch-job-with-ebs" |
 | computeEnvironmentType | コンピューティング環境タイプ | "SPOT" |
-| computeEnvironmentAllocationStrategy | 割り当て戦略 | "BEST_FIT_PROGRESSIVE" |
+| computeEnvironmentAllocationStrategy | 割り当て戦略 | "SPOT_PRICE_CAPACITY_OPTIMIZED" |
 | computeEnvironmentInstanceTypes | インスタンスタイプ | ["optimal"] |
 | computeEnvironmentMinvCpus | 最小vCPU数 | 0 |
 | computeEnvironmentMaxvCpus | 最大vCPU数 | 256 |
