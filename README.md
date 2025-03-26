@@ -136,37 +136,67 @@ npx cdk deploy -c type=onlyEBS
 
 ## サンプルジョブによるテスト
 
-このプロジェクトには、ストレージパフォーマンスをテストするためのスクリプトが含まれています：
+以下の手順でサンプルジョブをテストできます：
 
-### FSx for Lustre
+1. ECRリポジトリにイメージをプッシュします：
 ```
-docker/lustre/write_delete_test_lustre.sh
-```
-
-### EBS
-```
-docker/ebs/write_delete_test_ebs_v2.sh
-docker/ebs/write_delete_test_ebs_with_s3.sh
-docker/ebs/write_delete_test_ebs_with_s3_sync.sh
+./docker/push-image.sh <ECR のリポジトリ名>
 ```
 
-これらのスクリプトは、指定されたサイズのファイルを書き込み、削除するベンチマークを実行します。
+ECR のリポジトリは、それぞれのタイプに合わせて以下のリポジトリが作成されます：
+- auto Export：batch-job-with-lustre-auto-export
+- task Export：batch-job-with-lustre-task-export
+- EBS：batch-job-with-ebs
+
+2. StepFunction を実行します。使用するモードに合わせてそれぞれ以下の名前から始まる StepFunctionが作成されています：
+- auto Export：CreateLustreAutoExportStateMachine*
+- task Export：CreateLustreTaskExportStateMachine*
+- EBS：BatchJobWithEbsStateMachine*
+
+入力は何も入れず、「Start Execution」ボタンを押すことで Step Function が実行されます。
+<img src="docs/img/test_sample_job/execute_sfn.png" alt="Step Function実行画面" width="500" />
+
+3. パラメータを変更したい場合は、Secrets Manager から変更が可能です。使用するモードに合わせてそれぞれ以下の名前から始まる Secrets Manager のシークレットが作成されています：
+- auto Export：BatchWithLustreAutoExport*
+- task Export：BatchWithLustreTaskExport*
+- EBS：BatchWithEbsSecret*
+<img src="docs/img/test_sample_job/edit_secrets.png" alt="Secrets Manager編集画面" width="500" />
+
+変更できるパラメータはそれぞれのタイプにおける詳細ドキュメントを参照してください：
+- [auto Export モード](docs/auto_export_mode.md)
+- [task Export モード](docs/task_export_mode.md)
+- [Only EBS モード](docs/only_ebs_mode.md)
 
 ## カスタマイズ
 
 `cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます：
 
+### ストレージ設定
+
 - **FSx for Lustre**:
   - `lustreStorageCapacity`: ストレージ容量（GB）
   - `lustreFileSystemTypeVersion`: Lustreバージョン
-  - `computeEnvironmentType`: コンピューティング環境タイプ（SPOT/EC2）
-  - `jobDefinitionVcpus`: ジョブあたりのvCPU数
-  - `jobDefinitionMemory`: ジョブあたりのメモリ（MB）
+  - `lustreImportedFileChunkSize`: インポートチャンクサイズ（MB）
 
 - **EBS**:
   - `ebsSizeGb`: EBSボリュームサイズ（GB）
   - `ebsIOPS`: EBSのIOPS
   - `ebsThroughput`: EBSのスループット（MB/s）
+
+### AWS Batch 設定
+
+- **コンピューティング環境**:
+  - `computeEnvironmentType`: コンピューティング環境タイプ。'SPOT'または'EC2'を選択可能。
+  - `computeEnvironmentAllocationStrategy`: 割り当て戦略。デフォルトでは'SPOT_PRICE_CAPACITY_OPTIMIZED'に設定されています。詳細は[AWS Batchのドキュメント](https://docs.aws.amazon.com/batch/latest/userguide/allocation-strategies.html)を参照してください。
+  - `computeEnvironmentInstanceTypes`: 使用するインスタンスタイプ。デフォルトでは["optimal"]に設定されていますが、特定のインスタンスタイプを指定することも可能です。例: ["c4.4xlarge", "m4.4xlarge", "c4.8xlarge"]
+  - `computeEnvironmentMinvCpus`: 最小vCPU数
+  - `computeEnvironmentMaxvCpus`: 最大vCPU数
+  - `computeEnvironmentDesiredvCpus`: 希望vCPU数
+
+- **ジョブ定義**:
+  - `jobDefinitionRetryAttempts`: ジョブ再試行回数
+  - `jobDefinitionVcpus`: ジョブあたりのvCPU数
+  - `jobDefinitionMemory`: ジョブあたりのメモリ（MB）
 
 ## Step Functionsによるオーケストレーション
 
