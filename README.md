@@ -38,21 +38,21 @@ SPOTインスタンスを活用してコスト効率を最大化するために�
 
 このプロジェクトは、AWS BatchとAmazon FSx for Lustre/EBSを組み合わせた3つの異なるアーキテクチャモードを提供します。各モードは特定のユースケースに最適化されており、ワークロードの特性に応じて選択できます。
 
-### Auto Export モード
+### Lustre Auto Export モード
+Lustre Auto Export モードでは、Lustreファイルシステム上での変更が自動的にS3バケットに反映されます。バッチジョブ中のデータを同期的にS3にエクスポートしたい場合に最適です。。CloudWatchメトリクスを監視してエクスポート完了を確認し、すべてのデータがS3に同期された後にリソースをクリーンアップします。
 
 <img src="docs/img/architecture/auto_export_archi.png" alt="Auto Export モードのアーキテクチャ" width="500" />
 
-Auto Export モードでは、Lustreファイルシステム上での変更が自動的にS3バケットに反映されます。バッチジョブ中のデータを同期的にS3にエクスポートしたい場合に最適です。。CloudWatchメトリクスを監視してエクスポート完了を確認し、すべてのデータがS3に同期された後にリソースをクリーンアップします。
 
-### Task Export モード
+### Lustre Task Export モード
 
-Task Export モードでは、ジョブ完了後に明示的な[データリポジトリタスク](https://docs.aws.amazon.com/fsx/latest/LustreGuide/data-repository-tasks.html)を実行してLustreからS3へのデータエクスポートを行います。バッチ処理や大規模データセットの処理に最適で、ジョブ実行中のエクスポートによるオーバーヘッドを避けることができます。
+Lustre Task Export モードでは、ジョブ完了後に明示的な[データリポジトリタスク](https://docs.aws.amazon.com/fsx/latest/LustreGuide/data-repository-tasks.html)を実行してLustreからS3へのデータエクスポートを行います。バッチ処理や大規模データセットの処理に最適で、ジョブ実行中のエクスポートによるオーバーヘッドを避けることができます。
 
 <img src="docs/img/architecture/task_export_archi.png" alt="Task Export モードのアーキテクチャ" width="500" />
 
-### Only EBS モード
+### EBS モード
 
-Only EBS モードでは、EBSボリュームを使用してシングルノードでの処理を最適化します。共有ファイルシステムが不要な場合や、コスト効率を重視する場合に適しています。S3との連携も可能ですが、手動またはBatchジョブの中で行う必要があります。
+EBS モードでは、EBSボリュームを使用してシングルノードでの処理を最適化します。共有ファイルシステムが不要な場合や、コスト効率を重視する場合に適しています。S3との連携も可能ですが、手動またはBatchジョブの中で行う必要があります。
 
 <img src="docs/img/architecture/only_ebs_archi.png" alt="Only EBS モードのアーキテクチャ" width="500" />
 
@@ -84,9 +84,9 @@ Only EBS モードでは、EBSボリュームを使用してシングルノー�
 
 このプロジェクトは3つのデプロイモードをサポートしています：
 
-1. **autoExport**: FSx for Lustreを使用し、変更を自動的にS3にエクスポート ([詳細](docs/auto_export_mode.md))
-2. **taskExport**: FSx for Lustreを使用し、明示的なエクスポートタスクを実行 ([詳細](docs/task_export_mode.md))
-3. **onlyEBS**: EBSボリュームのみを使用 ([詳細](docs/only_ebs_mode.md))
+1. **Lustre Auto Export**: FSx for Lustreを使用し、変更を自動的にS3にエクスポート ([詳細](docs/auto_export_mode.md))
+2. **Lustre Task Export**: FSx for Lustreを使用し、明示的なエクスポートタスクを実行 ([詳細](docs/task_export_mode.md))
+3. **EBS**: EBSボリュームのみを使用 ([詳細](docs/only_ebs_mode.md))
 
 各モードの詳細な説明とパラメータについては、リンク先のドキュメントを参照してください。
 
@@ -142,30 +142,29 @@ npx cdk deploy -c type=onlyEBS
 ```
 ./docker/push-image.sh <ECR のリポジトリ名>
 ```
-
 ECR のリポジトリは、それぞれのタイプに合わせて以下のリポジトリが作成されます：
-- auto Export：batch-job-with-lustre-auto-export
 - task Export：batch-job-with-lustre-task-export
+- auto Export：batch-job-with-lustre-auto-export
 - EBS：batch-job-with-ebs
 
 2. StepFunction を実行します。使用するモードに合わせてそれぞれ以下の名前から始まる StepFunctionが作成されています：
-- auto Export：CreateLustreAutoExportStateMachine*
 - task Export：CreateLustreTaskExportStateMachine*
+- auto Export：CreateLustreAutoExportStateMachine*
 - EBS：BatchJobWithEbsStateMachine*
 
 入力は何も入れず、「Start Execution」ボタンを押すことで Step Function が実行されます。
 <img src="docs/img/test_sample_job/execute_sfn.png" alt="Step Function実行画面" width="500" />
 
 3. パラメータを変更したい場合は、Secrets Manager から変更が可能です。使用するモードに合わせてそれぞれ以下の名前から始まる Secrets Manager のシークレットが作成されています：
-- auto Export：BatchWithLustreAutoExport*
-- task Export：BatchWithLustreTaskExport*
+- Lustre Task Export：BatchWithLustreTaskExport*
+- Lustre Auto Export：BatchWithLustreAutoExport*
 - EBS：BatchWithEbsSecret*
 <img src="docs/img/test_sample_job/edit_secrets.png" alt="Secrets Manager編集画面" width="500" />
 
 変更できるパラメータはそれぞれのタイプにおける詳細ドキュメントを参照してください：
-- [auto Export モード](docs/auto_export_mode.md)
-- [task Export モード](docs/task_export_mode.md)
-- [Only EBS モード](docs/only_ebs_mode.md)
+- [Lustre Task Export モード](docs/task_export_mode.md)
+- [Lustre Auto Export モード](docs/auto_export_mode.md)
+- [EBS モード](docs/only_ebs_mode.md)
 
 ## カスタマイズ
 
