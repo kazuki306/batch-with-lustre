@@ -38,7 +38,10 @@ else
 fi
 
 # 変数の設定
-AWS_REGION="${AWS_REGION:-ap-northeast-1}"  # 環境変数が設定されていない場合はデフォルト値を使用
+# AWS CLIのデフォルトリージョンを取得
+DEFAULT_AWS_REGION=$(aws configure get region 2>/dev/null || echo "ap-northeast-1")
+# 環境変数が設定されていない場合はAWS CLIのデフォルトリージョンを使用
+AWS_REGION="${AWS_REGION:-$DEFAULT_AWS_REGION}"
 IMAGE_TAG="latest"
 
 echo "使用するAWSリージョン: ${AWS_REGION}"

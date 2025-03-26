@@ -10,6 +10,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
 interface BatchWithEbsStackProps extends cdk.StackProps {
+  envName?: string;
   ebsSizeGb?: number;
   ebsIOPS?: number;
   ebsThroughput?: number;
@@ -32,6 +33,7 @@ interface BatchWithEbsStackProps extends cdk.StackProps {
 export class BatchWithEbsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: BatchWithEbsStackProps) {
     super(scope, id, props);
+    const envName = props?.envName ?? 'Default';
     const ebsSizeGb = props?.ebsSizeGb ?? 500;
     const ebsIOPS = props?.ebsIOPS ?? 5000;
     const ebsThroughput = props?.ebsThroughput ?? 500;
@@ -61,7 +63,7 @@ export class BatchWithEbsStack extends cdk.Stack {
     const containerImageUri = `${this.account}.dkr.ecr.${this.region}.amazonaws.com/${ecrRepositoryName}:latest`;
 
     // Store EBS size and related parameters in Secrets Manager
-    const ebsSecret = new secretsmanager.Secret(this, 'BatchWithEbsSecret', {
+    const ebsSecret = new secretsmanager.Secret(this, `BatchJobWith${envName}Secret`, {
       description: 'Configuration values for executing AWS Batch jobs with StepFunction',
       secretObjectValue: {
         ebsSizeGb: cdk.SecretValue.unsafePlainText(ebsSizeGb.toString()),
@@ -79,7 +81,7 @@ export class BatchWithEbsStack extends cdk.Stack {
     });
 
     // Create a VPC in a single AZ
-    const vpc = new ec2.Vpc(this, 'BatchVPC', {
+    const vpc = new ec2.Vpc(this, `BatchJobWith${envName}VPC`, {
       maxAzs: 1,
       natGateways: 1,
       subnetConfiguration: [
@@ -97,7 +99,7 @@ export class BatchWithEbsStack extends cdk.Stack {
     });
 
     // Create S3 bucket
-    const bucket = new s3.Bucket(this, 'DataBucket', {
+    const bucket = new s3.Bucket(this, `BatchJobWith${envName}DataBucket`, {
       versioned: true,
       encryption: s3.BucketEncryption.S3_MANAGED,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -130,7 +132,7 @@ export class BatchWithEbsStack extends cdk.Stack {
     // });
 
     // Security group for Batch
-    const batchSecurityGroup = new ec2.SecurityGroup(this, 'BatchSecurityGroup', {
+    const batchSecurityGroup = new ec2.SecurityGroup(this, `BatchJobWith${envName}SecurityGroup`, {
       vpc,
       description: 'Security group for AWS Batch',
       allowAllOutbound: true,
@@ -170,7 +172,7 @@ export class BatchWithEbsStack extends cdk.Stack {
     );
 
     // Batch compute environment
-    const computeEnvironment = new batch.CfnComputeEnvironment(this, 'BatchJobWithEbsComputeEnvironment', {
+    const computeEnvironment = new batch.CfnComputeEnvironment(this, `BatchJobWith${envName}}`, {
       type: 'MANAGED',
       computeResources: {
         type: computeEnvironmentType,
@@ -189,7 +191,7 @@ export class BatchWithEbsStack extends cdk.Stack {
     });
 
     // Job queue
-    const jobQueue = new batch.CfnJobQueue(this, 'JobQueue', {
+    const jobQueue = new batch.CfnJobQueue(this, `BatchJobWith${envName}JobQueue`, {
       priority: 1,
       state: 'ENABLED',
       computeEnvironmentOrder: [
@@ -201,7 +203,7 @@ export class BatchWithEbsStack extends cdk.Stack {
     });
 
     // Create IAM role for container
-    const containerJobRole = new iam.Role(this, 'ContainerJobRole', {
+    const containerJobRole = new iam.Role(this, `BatchJobWith${envName}ContainerJobRole`, {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
       inlinePolicies: {
         'S3Permissions': new iam.PolicyDocument({
@@ -224,7 +226,7 @@ export class BatchWithEbsStack extends cdk.Stack {
     });
 
     // IAM role for Step Functions
-    const stepFunctionsRole = new iam.Role(this, 'CreateEbsStateMachineRole', {
+    const stepFunctionsRole = new iam.Role(this, `BatchJobWith${envName}StateMachineRole`, {
       assumedBy: new iam.ServicePrincipal('states.amazonaws.com'),
       inlinePolicies: {
         'EbsPermissions': new iam.PolicyDocument({
@@ -554,7 +556,7 @@ export class BatchWithEbsStack extends cdk.Stack {
       .next(checkEbsStatus)
       .next(isEbsAvailable);
 
-    new sfn.StateMachine(this, 'BatchJobWithEbsStateMachine', {
+    new sfn.StateMachine(this, `BatchJobWith${envName}StateMachine`, {
       definitionBody: sfn.DefinitionBody.fromChainable(definition),
       role: stepFunctionsRole
     });

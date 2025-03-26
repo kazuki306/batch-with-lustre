@@ -164,18 +164,18 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 - EBS：**batch-job-with-ebs**
 
 2. Step Functions を実行します。使用するモードに合わせてそれぞれ以下の名前から始まる Step Functions が作成されています：
-- Lustre Task Export：__CreateLustreTaskExportStateMachine*__
-- Lustre Auto Export：__CreateLustreAutoExportStateMachine*__
-- EBS：__BatchJobWithEbsStateMachine*__
+- Lustre Task Export：__BatchJobWithTaskExportStateMachine*__
+- Lustre Auto Export：__BatchJobWithAutoExportStateMachine*__
+- EBS：__BatchJobWithOnlyEBSStateMachine*__
 
 入力は何も入れず、「Start Execution」ボタンを押すことで Step Functions が実行されます。
 
 <img src="docs/img/test_sample_job/execute_sfn.png" alt="Step Function実行画面"/>
 
 3. パラメータを変更したい場合は、Step Functions の実行前に Secrets Manager の値を変更することで実現できます。使用するモードに合わせてそれぞれ以下の名前から始まる Secrets Manager のシークレットが作成されています：
-- Lustre Task Export：__BatchWithLustreTaskExport*__
-- Lustre Auto Export：__BatchWithLustreAutoExport*__
-- EBS：__BatchWithEbsSecret*__
+- Lustre Task Export：__BatchJobWithTaskExport*__
+- Lustre Auto Export：__BatchJobWithAutoExport*__
+- EBS：__BatchJobWithOnlyEbsSecret*__
 
 <img src="docs/img/test_sample_job/edit_secrets.png" alt="Secrets Manager編集画面"/>
 

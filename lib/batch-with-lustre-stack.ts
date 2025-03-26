@@ -92,12 +92,12 @@ export class BatchWithLustreStack extends cdk.Stack {
       secretObjectValue.waitForDataRepositoryTaskSeconds = cdk.SecretValue.unsafePlainText(waitForDataRepositoryTaskSeconds.toString());
     }
 
-    const lustreSecret = new secretsmanager.Secret(this, autoExport ? 'BatchWithLustreAutoExportSecret' : 'BatchWithLustreTaskExportSecret', {
-      description: `Configuration values for executing AWS Batch jobs with FSx for Lustre and StepFunction (${autoExport ? 'AutoExport' : 'TaskExport'})`,
+    const lustreSecret = new secretsmanager.Secret(this, `BatchJobWith${envName}Secret`, {
+      description: `Configuration values for executing AWS Batch jobs with FSx for Lustre and StepFunction (${envName})`,
       secretObjectValue,
     });
 
-    const vpc = new ec2.Vpc(this, 'BatchVPC', {
+    const vpc = new ec2.Vpc(this, `BatchJobWith${envName}VPC`, {
       maxAzs: 2,
       natGateways: 1,
       subnetConfiguration: [
@@ -115,7 +115,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     });
 
     // S3バケットの作成
-    const bucket = new s3.Bucket(this, 'DataBucket', {
+    const bucket = new s3.Bucket(this, `BatchJobWith${envName}DataBucket`, {
       versioned: true,
       encryption: s3.BucketEncryption.S3_MANAGED,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -146,7 +146,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     // });
 
     // FSx for Lustre用のセキュリティグループ
-    const lustreSecurityGroup = new ec2.SecurityGroup(this, 'LustreSecurityGroup', {
+    const lustreSecurityGroup = new ec2.SecurityGroup(this, `BatchJobWith${envName}SecurityGroup`, {
       vpc,
       description: 'Security group for FSx for Lustre',
       allowAllOutbound: true,
@@ -177,7 +177,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     );
 
     // Batchのコンピューティング環境
-    const computeEnvironment = new batch.CfnComputeEnvironment(this, 'ComputeEnvironment', {
+    const computeEnvironment = new batch.CfnComputeEnvironment(this, `BatchJobWith${envName}`, {
       type: 'MANAGED',
       computeResources: {
         type: computeEnvironmentType,
@@ -196,7 +196,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     });
 
     // ジョブキュー
-    const jobQueue = new batch.CfnJobQueue(this, 'JobQueue', {
+    const jobQueue = new batch.CfnJobQueue(this, `BatchJobWith${envName}JobQueue`, {
       priority: 1,
       state: 'ENABLED',
       computeEnvironmentOrder: [
@@ -242,7 +242,7 @@ export class BatchWithLustreStack extends cdk.Stack {
     );
 
     // Step Functions用のIAMロール
-    const stepFunctionsRole = new iam.Role(this, 'CreateLustreStateMachineRole', {
+    const stepFunctionsRole = new iam.Role(this, `BatchJobWith${envName}StateMachineRole`, {
       assumedBy: new iam.ServicePrincipal('states.amazonaws.com'),
       inlinePolicies: {
         'FSxPermissions': new iam.PolicyDocument({
@@ -737,14 +737,14 @@ export class BatchWithLustreStack extends cdk.Stack {
     deleteFSx.next(jobSucceeded);
 
     // StateMachine名の決定
-    let stateMachineName: string;
-    if (autoExport) {
-      stateMachineName = 'CreateLustreAutoExportStateMachine';
-    } else {
-      stateMachineName = 'CreateLustreTaskExportStateMachine';
-    }
+    // let stateMachineName: string;
+    // if (autoExport) {
+    //   stateMachineName = 'CreateLustreAutoExportStateMachine';
+    // } else {
+    //   stateMachineName = 'CreateLustreTaskExportStateMachine';
+    // }
 
-    new sfn.StateMachine(this, stateMachineName, {
+    new sfn.StateMachine(this, `BatchJobWith${envName}StateMachine`, {
       definition,
       role: stepFunctionsRole
     });
