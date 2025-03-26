@@ -142,22 +142,24 @@ npx cdk deploy -c type=onlyEBS
 ./docker/push-image.sh <ECR のリポジトリ名>
 ```
 ECR のリポジトリは、それぞれのタイプに合わせて以下のリポジトリが作成されます：
-- Lustre Task Export：batch-job-with-lustre-task-export
-- Lustre Auto Export：batch-job-with-lustre-auto-export
-- EBS：batch-job-with-ebs
+- Lustre Task Export：**batch-job-with-lustre-task-export**
+- Lustre Auto Export：**batch-job-with-lustre-auto-export**
+- EBS：**batch-job-with-ebs**
 
 2. StepFunction を実行します。使用するモードに合わせてそれぞれ以下の名前から始まる StepFunctionが作成されています：
-- Lustre Task Export：CreateLustreTaskExportStateMachine*
-- Lustre Auto Export：CreateLustreAutoExportStateMachine*
-- EBS：BatchJobWithEbsStateMachine*
+- Lustre Task Export：__CreateLustreTaskExportStateMachine*__
+- Lustre Auto Export：__CreateLustreAutoExportStateMachine*__
+- EBS：__BatchJobWithEbsStateMachine*__
 
 入力は何も入れず、「Start Execution」ボタンを押すことで Step Function が実行されます。
+
 <img src="docs/img/test_sample_job/execute_sfn.png" alt="Step Function実行画面" width="500" />
 
 3. パラメータを変更したい場合は、Secrets Manager から変更が可能です。使用するモードに合わせてそれぞれ以下の名前から始まる Secrets Manager のシークレットが作成されています：
-- Lustre Task Export：BatchWithLustreTaskExport*
-- Lustre Auto Export：BatchWithLustreAutoExport*
-- EBS：BatchWithEbsSecret*
+- Lustre Task Export：__BatchWithLustreTaskExport*__
+- Lustre Auto Export：__BatchWithLustreAutoExport*__
+- EBS：__BatchWithEbsSecret*__
+
 <img src="docs/img/test_sample_job/edit_secrets.png" alt="Secrets Manager編集画面" width="500" />
 
 変更できるパラメータはそれぞれのタイプにおける詳細ドキュメントを参照してください：
