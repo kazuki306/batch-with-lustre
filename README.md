@@ -208,9 +208,9 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 
 | パラメータ名 | 説明 | 備考 |
 |------------|------|------|
-| `computeEnvironmentType` | コンピューティング環境タイプ | `SPOT` または `EC2` を選択可能。 |
-| `computeEnvironmentAllocationStrategy` | 割り当て戦略 | デフォルトでは `SPOT_PRICE_CAPACITY_OPTIMIZED` に設定。([詳細](https://docs.aws.amazon.com/batch/latest/userguide/allocation-strategies.html)) |
-| `computeEnvironmentInstanceTypes` | 使用するインスタンスタイプ | デフォルトでは ["optimal"]。インスタンスタイプを指定することも可能。<br> 例: ["c4.4xlarge","m4.4xlarge", "c4.8xlarge"] |
+| `computeEnvironmentType` | コンピューティング環境タイプ | `SPOT` または `EC2` を選択可能 |
+| `computeEnvironmentAllocationStrategy` | 割り当て戦略 | デフォルトでは `SPOT_PRICE_CAPACITY_OPTIMIZED` に設定 ([詳細](https://docs.aws.amazon.com/batch/latest/userguide/allocation-strategies.html)) |
+| `computeEnvironmentInstanceTypes` | 使用するインスタンスタイプ | デフォルトでは ["optimal"]。インスタンスタイプを指定することも可能<br> 例: ["c4.4xlarge","m4.4xlarge", "c4.8xlarge"] |
 | `computeEnvironmentMinvCpus` | 最小vCPU数 | - |
 | `computeEnvironmentMaxvCpus` | 最大vCPU数 | - |
 | `computeEnvironmentDesiredvCpus` | 希望vCPU数 | - |
