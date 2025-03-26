@@ -40,18 +40,18 @@ SPOTインスタンスを活用してコスト効率を最大化するために�
 
 ### Lustre Task Export モード
 
-Lustre Task Export モードでは、ジョブ完了後に明示的な[データリポジトリタスク](https://docs.aws.amazon.com/fsx/latest/LustreGuide/data-repository-tasks.html)を実行してLustreからS3へのデータエクスポートを行います。バッチ処理や大規模データセットの処理に最適で、ジョブ実行中のエクスポートによるオーバーヘッドを避けることができます。
+Lustre Task Export モードでは、ジョブ完了後に明示的な[データリポジトリタスク](https://docs.aws.amazon.com/fsx/latest/LustreGuide/data-repository-tasks.html)を実行してLustreからS3へのデータエクスポートを行います。バッチ処理や大規模データセットの処理に最適で、ジョブ実行中のエクスポートによるオーバーヘッドを避けることができます。 ([詳細](docs/task_export_mode.md))
 
 <img src="docs/img/architecture/task_export_archi.png" alt="Task Export モードのアーキテクチャ" width="500" />
 
 ### Lustre Auto Export モード
-Lustre Auto Export モードでは、Lustreファイルシステム上での変更が自動的にS3バケットに反映されます。バッチジョブ中のデータを同期的にS3にエクスポートしたい場合に最適です。。CloudWatchメトリクスを監視してエクスポート完了を確認し、すべてのデータがS3に同期された後にリソースをクリーンアップします。
+Lustre Auto Export モードでは、Lustreファイルシステム上での変更が自動的にS3バケットに反映されます。バッチジョブ中のデータを同期的にS3にエクスポートしたい場合に最適です。。CloudWatchメトリクスを監視してエクスポート完了を確認し、すべてのデータがS3に同期された後にリソースをクリーンアップします。 ([詳細](docs/auto_export_mode.md))
 
 <img src="docs/img/architecture/auto_export_archi.png" alt="Auto Export モードのアーキテクチャ" width="500" />
 
 ### EBS モード
 
-EBS モードでは、EBSボリュームを使用してシングルノードでの処理を最適化します。共有ファイルシステムが不要な場合や、コスト効率を重視する場合に適しています。S3との連携も可能ですが、手動またはBatchジョブの中で行う必要があります。
+EBS モードでは、EBSボリュームを使用してシングルノードでの処理を最適化します。共有ファイルシステムが不要な場合や、コスト効率を重視する場合に適しています。S3との連携も可能ですが、手動またはBatchジョブの中で行う必要があります。 ([詳細](docs/only_ebs_mode.md))
 
 <img src="docs/img/architecture/only_ebs_archi.png" alt="Only EBS モードのアーキテクチャ" width="500" />
 
@@ -79,15 +79,15 @@ EBS モードでは、EBSボリュームを使用してシングルノードで�
    - コスト効率の良いストレージオプション
    - S3との連携オプション -->
 
-## デプロイモード
+<!-- ## デプロイモード
 
 このプロジェクトは3つのデプロイモードをサポートしています：
 
 1. [**Lustre Task Export**](docs/task_export_mode.md): FSx for Lustreを使用し、明示的なエクスポートタスクを実行
-2. [**Lustre Auto Export**](docs/auto_export_mode.md): FSx for Lustreを使用し、変更を自動的にS3にエクスポート
-3. [**EBS**](docs/only_ebs_mode.md): EBSボリュームのみを使用
+2. [**Lustre Auto Export**](docs/auto_export_mode.md): FSx for Lustreを使用し、変更を自動的にS3にエクスポート ([詳細](d))
+3. [**EBS**](docs/only_ebs_mode.md): EBSボリュームのみを使用 ([詳細]())
 
-各モードの詳細な説明とパラメータについては、リンク先のドキュメントを参照してください。
+各モードの詳細な説明とパラメータについては、リンク先のドキュメントを参照してください。 -->
 
 ## 前提条件
 
