@@ -35,7 +35,7 @@ SPOTインスタンスは中断される可能性があるため、以下の点�
   - 自動的にスケーリング
   - 中程度のスループットとパフォーマンス
 
-- **FSx for Lustre**:
+- **Amazon FSx for Lustre**:
   - 高性能な並列ファイルシステム
   - 高スループットと低レイテンシ
   - 大規模なデータセットや高性能コンピューティングに最適
@@ -47,7 +47,7 @@ SPOTインスタンスは中断される可能性があるため、以下の点�
   - コスト効率が良い
   - 単一のEC2インスタンスにのみアタッチ可能
 
-このプロジェクトでは、複数ノードによるジョブで使われるFSx for Lustreと、シングルノードジョブ向けのEBSに焦点を当てています。AWS BatchでEFSを利用する方法については、[AWSのドキュメント](https://docs.aws.amazon.com/ja_jp/batch/latest/userguide/efs-volumes.html)を参照してください。
+このプロジェクトでは、複数ノードによるジョブではFSx for Lustre、シングルノードジョブではEBSに焦点を当てます。AWS BatchでEFSを利用する方法については、[AWS Batch のユーザーガイド](https://docs.aws.amazon.com/ja_jp/batch/latest/userguide/efs-volumes.html)を参照してください。
 
 ## アーキテクチャ
 
@@ -57,19 +57,19 @@ SPOTインスタンスは中断される可能性があるため、以下の点�
 
 <img src="docs/img/architecture/auto_export_archi.png" alt="Auto Export モードのアーキテクチャ" width="500" />
 
-Auto Export モードでは、FSx for Lustreファイルシステム上での変更が自動的にS3バケットに反映されます。リアルタイムデータ処理や継続的なデータ生成シナリオに最適です。CloudWatchメトリクスを監視してエクスポート完了を確認し、すべてのデータがS3に同期された後にリソースをクリーンアップします。
+Auto Export モードでは、Lustreファイルシステム上での変更が自動的にS3バケットに反映されます。バッチジョブ中のデータを同期的にS3にエクスポートしたい場合に最適です。。CloudWatchメトリクスを監視してエクスポート完了を確認し、すべてのデータがS3に同期された後にリソースをクリーンアップします。
 
 ### Task Export モード
 
-<img src="docs/img/architecture/task_export_archi.png" alt="Task Export モードのアーキテクチャ" width="500" />
+Task Export モードでは、ジョブ完了後に明示的な[データリポジトリタスク](https://docs.aws.amazon.com/fsx/latest/LustreGuide/data-repository-tasks.html)を実行してS3へのエクスポートを行います。バッチ処理や大規模データセットの処理に最適で、ジョブ実行中のエクスポートによるオーバーヘッドを避けることができます。
 
-Task Export モードでは、ジョブ完了後に明示的なデータリポジトリタスクを実行してS3へのエクスポートを行います。バッチ処理や大規模データセットの処理に最適で、ジョブ実行中のエクスポートによるオーバーヘッドを避けることができます。
+<img src="docs/img/architecture/task_export_archi.png" alt="Task Export モードのアーキテクチャ" width="500" />
 
 ### Only EBS モード
 
-<img src="docs/img/architecture/only_ebs_archi.png" alt="Only EBS モードのアーキテクチャ" width="500" />
+Only EBS モードでは、EBSボリュームを使用してシングルノードでの処理を最適化します。共有ファイルシステムが不要な場合や、コスト効率を重視する場合に適しています。S3との連携も可能ですが、手動またはBatchジョブの中で行う必要があります。
 
-Only EBS モードでは、高性能なEBSボリュームを使用してシングルノードでの処理を最適化します。共有ファイルシステムが不要な場合や、コスト効率を重視する場合に適しています。S3との連携も可能ですが、手動またはスクリプトを通じて行う必要があります。
+<img src="docs/img/architecture/only_ebs_archi.png" alt="Only EBS モードのアーキテクチャ" width="500" />
 
 ### 共通コンポーネント
 - **AWS Batch**: コンピューティングリソースの管理とジョブの実行
