@@ -153,21 +153,21 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 
 入力は何も入れず、「Start Execution」ボタンを押すことで Step Function が実行されます。
 
-<img src="docs/img/test_sample_job/execute_sfn.png" alt="Step Function実行画面" width="500" />
+<img src="docs/img/test_sample_job/execute_sfn.png" alt="Step Function実行画面"/>
 
 3. パラメータを変更したい場合は、Secrets Manager から変更が可能です。使用するモードに合わせてそれぞれ以下の名前から始まる Secrets Manager のシークレットが作成されています：
 - Lustre Task Export：__BatchWithLustreTaskExport*__
 - Lustre Auto Export：__BatchWithLustreAutoExport*__
 - EBS：__BatchWithEbsSecret*__
 
-<img src="docs/img/test_sample_job/edit_secrets.png" alt="Secrets Manager編集画面" width="500" />
+<img src="docs/img/test_sample_job/edit_secrets.png" alt="Secrets Manager編集画面"/>
 
 変更できるパラメータはそれぞれのタイプにおける詳細ドキュメントを参照してください：
 - [Lustre Task Export モード](docs/task_export_mode.md)
 - [Lustre Auto Export モード](docs/auto_export_mode.md)
 - [EBS モード](docs/only_ebs_mode.md)
 
-## カスタマイズ
+<!-- ## カスタマイズ
 
 `cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます：
 
@@ -205,7 +205,7 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 1. **ストレージの作成**: FSx for LustreファイルシステムまたはEBSボリュームを作成
 2. **Batchジョブの実行**: 作成したストレージを使用してBatchジョブを実行
 3. **結果の保存**: 処理結果をS3に保存（自動または明示的なエクスポート）
-4. **ストレージの削除**: ジョブ完了後にストレージリソースを削除（オプション）
+4. **ストレージの削除**: ジョブ完了後にストレージリソースを削除（オプション） -->
 
 <!-- この自動化により、以下のメリットが得られます：
 
