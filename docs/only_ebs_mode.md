@@ -70,7 +70,7 @@ EBSモードでは、Step Functionsワークフローが以下のEBS関連タス
 | ebsSizeGb | EBSボリュームサイズ（GB） | 500 |
 | ebsIOPS | EBSのIOPS | 5000 |
 | ebsThroughput | EBSのスループット（MB/s） | 500 |
-| jobDefinitionContainerImage | ジョブで使用するコンテナイメージ | ECRリポジトリのイメージURI |
+| jobDefinitionContainerImage | ジョブで使用するコンテナイメージ | ECR のコンテナイメージ URI |
 | jobDefinitionRetryAttempts | ジョブ再試行回数 | 5 |
 | jobDefinitionVcpus | ジョブあたりのvCPU数 | 32 |
 | jobDefinitionMemory | ジョブあたりのメモリ（MB） | 30000 |

@@ -72,7 +72,7 @@ Lambda関数が定期的にCloudWatchメトリクスをチェックし、エク�
 | lustreFileSystemTypeVersion | Lustreバージョン | "2.15" |
 | lustreStorageCapacity | ストレージ容量（GB） | 2400 |
 | lustreImportedFileChunkSize | インポートチャンクサイズ（MB） | 1024 |
-| jobDefinitionContainerImage | ジョブで使用するコンテナイメージ | ECRリポジトリのイメージURI |
+| jobDefinitionContainerImage | ジョブで使用するコンテナイメージ | ECR のコンテナイメージ URI |
 | jobDefinitionRetryAttempts | ジョブ再試行回数 | 5 |
 | jobDefinitionVcpus | ジョブあたりのvCPU数 | 32 |
 | jobDefinitionMemory | ジョブあたりのメモリ（MB） | 30000 |
