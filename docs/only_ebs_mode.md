@@ -56,7 +56,7 @@ EBSモードでは、Step Functionsワークフローが以下のEBS関連タス
 | computeEnvironmentMaxvCpus | 最大vCPU数 | 256 |
 | computeEnvironmentDesiredvCpus | 希望vCPU数 | 0 |
 
-### cdk.json と Secrets Manager の両方で変更可能なパラメータ
+### Secrets Manager で変更可能なパラメータ
 
 以下のパラメータは `cdk.json` での初期設定後、Secrets Manager から Step Functions 実行前に変更することも可能です：
 
@@ -66,6 +66,7 @@ EBSモードでは、Step Functionsワークフローが以下のEBS関連タス
 | ebsSizeGb | EBSボリュームサイズ（GB） | 500 |
 | ebsIOPS | EBSのIOPS | 5000 |
 | ebsThroughput | EBSのスループット（MB/s） | 500 |
+| jobDefinitionContainerImage | ジョブで使用するコンテナイメージ | ECRリポジトリのイメージURI |
 | jobDefinitionRetryAttempts | ジョブ再試行回数 | 5 |
 | jobDefinitionVcpus | ジョブあたりのvCPU数 | 32 |
 | jobDefinitionMemory | ジョブあたりのメモリ（MB） | 30000 |
