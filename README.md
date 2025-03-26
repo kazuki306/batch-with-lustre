@@ -179,10 +179,12 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 
 <img src="docs/img/test_sample_job/edit_secrets.png" alt="Secrets Manager編集画面"/>
 
+設定可能なパラメータについては以下の [パラメータのカスタマイズ](#パラメータのカスタマイズ) を参照してください。
+
 ## パラメータのカスタマイズ
 
-<!-- `cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます。一部のパラメータについては、`cdk.json` での初期設定後、Secrets Manager から Step Functions 実行前に変更することも可能です： -->
-Secrets Manager から変更可能な主なパラメータは以下の通りです：
+`cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます。一部のパラメータについては、CDK によるデプロイ後に、Secrets Manager から Step Functions 実行前に変更することも可能です：
+<!-- Secrets Manager から変更可能な主なパラメータは以下の通りです： -->
 
 ### ストレージ設定
 
