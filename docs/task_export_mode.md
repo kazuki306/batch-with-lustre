@@ -41,16 +41,15 @@ S3からLustreへの自動インポートは引き続き有効です：
 
 ## デプロイパラメータ
 
-`cdk.json`の`taskExport`セクションで以下のパラメータをカスタマイズできます：
+パラメータは `cdk.json` ファイルと AWS Secrets Manager の両方で設定できます。`cdk.json` はデプロイ時の初期値を設定し、Secrets Manager はジョブ実行時に値を上書きするために使用できます。
+
+### cdk.json でのみ変更可能なパラメータ
+
+以下のパラメータは `cdk.json` の `taskExport` セクションでのみ変更可能で、インフラストラクチャのデプロイ時に適用されます：
 
 | パラメータ | 説明 | デフォルト値 |
 |------------|------|------------|
 | envName | 環境名 | "TaskExport" |
-| autoExport | 自動エクスポート機能の有効化 | false |
-| deleteLustre | ジョブ完了後のLustre削除フラグ | true |
-| lustreFileSystemTypeVersion | Lustreバージョン | "2.15" |
-| lustreStorageCapacity | ストレージ容量（GB） | 2400 |
-| lustreImportedFileChunkSize | インポートチャンクサイズ（MB） | 1024 |
 | ecrRepositoryName | ECRリポジトリ名 | "batch-job-with-lustre-task-export" |
 | computeEnvironmentType | コンピューティング環境タイプ | "SPOT" |
 | computeEnvironmentAllocationStrategy | 割り当て戦略 | "BEST_FIT_PROGRESSIVE" |
@@ -58,6 +57,18 @@ S3からLustreへの自動インポートは引き続き有効です：
 | computeEnvironmentMinvCpus | 最小vCPU数 | 0 |
 | computeEnvironmentMaxvCpus | 最大vCPU数 | 256 |
 | computeEnvironmentDesiredvCpus | 希望vCPU数 | 0 |
+
+### cdk.json と Secrets Manager の両方で変更可能なパラメータ
+
+以下のパラメータは `cdk.json` での初期設定後、Secrets Manager で実行時に変更することも可能です：
+
+| パラメータ | 説明 | デフォルト値 |
+|------------|------|------------|
+| autoExport | 自動エクスポート機能の有効化 | false |
+| deleteLustre | ジョブ完了後のLustre削除フラグ | true |
+| lustreFileSystemTypeVersion | Lustreバージョン | "2.15" |
+| lustreStorageCapacity | ストレージ容量（GB） | 2400 |
+| lustreImportedFileChunkSize | インポートチャンクサイズ（MB） | 1024 |
 | jobDefinitionRetryAttempts | ジョブ再試行回数 | 5 |
 | jobDefinitionVcpus | ジョブあたりのvCPU数 | 32 |
 | jobDefinitionMemory | ジョブあたりのメモリ（MB） | 30000 |

@@ -39,15 +39,15 @@ EBSモードでは、Step Functionsワークフローが以下のEBS関連タス
 
 ## デプロイパラメータ
 
-`cdk.json`の`onlyEBS`セクションで以下のパラメータをカスタマイズできます：
+パラメータは `cdk.json` ファイルと AWS Secrets Manager の両方で設定できます。`cdk.json` はデプロイ時の初期値を設定し、Secrets Manager はジョブ実行時に値を上書きするために使用できます。
+
+### cdk.json でのみ変更可能なパラメータ
+
+以下のパラメータは `cdk.json` の `onlyEBS` セクションでのみ変更可能で、インフラストラクチャのデプロイ時に適用されます：
 
 | パラメータ | 説明 | デフォルト値 |
 |------------|------|------------|
 | envName | 環境名 | "OnlyEBS" |
-| deleteEbs | ジョブ完了後のEBS削除フラグ | true |
-| ebsSizeGb | EBSボリュームサイズ（GB） | 500 |
-| ebsIOPS | EBSのIOPS | 5000 |
-| ebsThroughput | EBSのスループット（MB/s） | 500 |
 | ecrRepositoryName | ECRリポジトリ名 | "batch-job-with-ebs" |
 | computeEnvironmentType | コンピューティング環境タイプ | "SPOT" |
 | computeEnvironmentAllocationStrategy | 割り当て戦略 | "BEST_FIT_PROGRESSIVE" |
@@ -55,6 +55,17 @@ EBSモードでは、Step Functionsワークフローが以下のEBS関連タス
 | computeEnvironmentMinvCpus | 最小vCPU数 | 0 |
 | computeEnvironmentMaxvCpus | 最大vCPU数 | 256 |
 | computeEnvironmentDesiredvCpus | 希望vCPU数 | 0 |
+
+### cdk.json と Secrets Manager の両方で変更可能なパラメータ
+
+以下のパラメータは `cdk.json` での初期設定後、Secrets Manager で実行時に変更することも可能です：
+
+| パラメータ | 説明 | デフォルト値 |
+|------------|------|------------|
+| deleteEbs | ジョブ完了後のEBS削除フラグ | true |
+| ebsSizeGb | EBSボリュームサイズ（GB） | 500 |
+| ebsIOPS | EBSのIOPS | 5000 |
+| ebsThroughput | EBSのスループット（MB/s） | 500 |
 | jobDefinitionRetryAttempts | ジョブ再試行回数 | 5 |
 | jobDefinitionVcpus | ジョブあたりのvCPU数 | 32 |
 | jobDefinitionMemory | ジョブあたりのメモリ（MB） | 30000 |
