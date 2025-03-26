@@ -24,7 +24,7 @@ SPOTインスタンスは優れたコスト効率を提供する一方で、中�
 
 **Amazon FSx for Lustre**は高性能な並列ファイルシステムで、高スループットと低レイテンシを実現します。大規模なデータセットや高性能コンピューティングに最適であり、S3との統合機能も備えています。複数ノードからの並列アクセスが必要な場合に特に威力を発揮します。
 
-**Amazon EBS**はシングルノードジョブに最適で、高いI/Oパフォーマンスを提供しながらコスト効率も良好です。ただし、単一のEC2インスタンスにのみアタッチ可能という制約があります (io1, io2 は[マルチアタッチ](https://docs.aws.amazon.com/ja_jp/ebs/latest/userguide/ebs-volumes-multi.html)ができます)。シングルノードのジョブであれば、Lustreなどのリッチなファイルシステムではなく、EBSを外からマウントする形で管理する方がコスト効率が良いケースが多いと考えられます。
+**Amazon EBS**はシングルノードジョブに最適で、高いI/Oパフォーマンスを提供しながらコスト効率も良好です。ただし、単一のEC2インスタンスにのみアタッチ可能という制約があります (io1, io2 は[マルチアタッチ](https://docs.aws.amazon.com/ja_jp/ebs/latest/userguide/ebs-volumes-multi.html)が可能です)。シングルノードのジョブであれば、Lustreなどのリッチなファイルシステムではなく、EBSを外からマウントする形で管理する方がコスト効率が良いケースが多いと考えられます。
 
 このプロジェクトでは、複数ノードによるジョブで使われるFSx for Lustreと、シングルノードジョブ向けのEBSに焦点を当てています。AWS BatchでEFSを利用する方法については、[AWS Batch のユーザーガイド](https://docs.aws.amazon.com/ja_jp/batch/latest/userguide/efs-volumes.html)を参照してください。
 
