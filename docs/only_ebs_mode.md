@@ -186,8 +186,8 @@ EBS モードは以下のようなシナリオに適しています：
 npx cdk deploy -c type=onlyEBS
 ```
 
-## 関連リソース
+<!-- ## 関連リソース
 
 - [Amazon EBS ドキュメント](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AmazonEBS.html)
 - [AWS Batch ドキュメント](https://docs.aws.amazon.com/batch/latest/userguide/what-is-batch.html)
-- [AWS Step Functions ドキュメント](https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html)
+- [AWS Step Functions ドキュメント](https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html) -->

@@ -160,8 +160,8 @@ Lustre Task Export モードは以下のようなシナリオに適していま�
 npx cdk deploy -c type=taskExport
 ```
 
-## 関連リソース
+<!-- ## 関連リソース
 
 - [Amazon FSx for Lustre データリポジトリタスク](https://docs.aws.amazon.com/fsx/latest/LustreGuide/data-repository-tasks.html)
 - [AWS Batch ドキュメント](https://docs.aws.amazon.com/batch/latest/userguide/what-is-batch.html)
-- [AWS Step Functions ドキュメント](https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html)
+- [AWS Step Functions ドキュメント](https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html) -->

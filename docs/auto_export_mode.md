@@ -151,8 +151,8 @@ Lustre Auto Export モードは以下のようなシナリオに適していま�
 npx cdk deploy -c type=autoExport
 ```
 
-## 関連リソース
+<!-- ## 関連リソース
 
 - [Amazon FSx for Lustre ドキュメント](https://docs.aws.amazon.com/fsx/latest/LustreGuide/what-is.html)
 - [AWS Batch ドキュメント](https://docs.aws.amazon.com/batch/latest/userguide/what-is-batch.html)
-- [AWS Step Functions ドキュメント](https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html)
+- [AWS Step Functions ドキュメント](https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html) -->
