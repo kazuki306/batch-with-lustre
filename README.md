@@ -164,7 +164,7 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 
 ## パラメータのカスタマイズ
 
-`cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます。以下はその一例です：
+`cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます。一部のパラメータについては、`cdk.json` での初期設定後、Secrets Manager から Step Functions 実行前に変更することも可能です：
 
 ### ストレージ設定
 
@@ -192,7 +192,7 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
   - `jobDefinitionVcpus`: ジョブあたりのvCPU数
   - `jobDefinitionMemory`: ジョブあたりのメモリ（MB）
 
-変更できるパラメータの詳細はそれぞれのタイプにおけるドキュメントを参照してください：
+その他変更できるパラメータの詳細はそれぞれのタイプにおけるドキュメントを参照してください：
 - [Lustre Task Export モード](docs/task_export_mode.md)
 - [Lustre Auto Export モード](docs/auto_export_mode.md)
 - [EBS モード](docs/only_ebs_mode.md)
