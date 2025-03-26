@@ -183,34 +183,45 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 
 ## パラメータのカスタマイズ
 
-`cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます。コンピューティング環境に関連するパラメータ以外は、CDK によるデプロイ後に Secrets Manager から変更可能です：
-<!-- Secrets Manager から変更可能な主なパラメータは以下の通りです： -->
+`cdk.json`ファイルの`context`セクションで各デプロイモードのパラメータをカスタマイズできます。コンピューティング環境に関連するパラメータ以外は、CDK によるデプロイ後に Secrets Manager から変更可能です。
 
 ### ストレージ設定
 
-- **FSx for Lustre**:
-  - `lustreFileSystemTypeVersion`: Lustreバージョン
-  - `lustreStorageCapacity`: ストレージ容量（GB）
+#### FSx for Lustre
 
-- **EBS**:
-  - `ebsSizeGb`: EBSボリュームサイズ（GB）
-  - `ebsIOPS`: EBSのIOPS
-  - `ebsThroughput`: EBSのスループット（MB/s）
+| パラメータ名 | 説明 | 単位 |
+|------------|------|------|
+| `lustreFileSystemTypeVersion` | Lustreバージョン | - |
+| `lustreStorageCapacity` | ストレージ容量 | GB |
+
+#### EBS
+
+| パラメータ名 | 説明 | 単位 |
+|------------|------|------|
+| `ebsSizeGb` | EBSボリュームサイズ | GB |
+| `ebsIOPS` | EBSのIOPS | IOPS |
+| `ebsThroughput` | EBSのスループット | MB/s |
 
 ### AWS Batch 設定
 
-- **コンピューティング環境**:
-  - `computeEnvironmentType`: コンピューティング環境タイプ。'SPOT'または'EC2'を選択可能。コスト効率を重視する場合は'SPOT'を推奨。
-  - `computeEnvironmentAllocationStrategy`: 割り当て戦略。デフォルトでは'SPOT_PRICE_CAPACITY_OPTIMIZED'に設定されており、SPOTインスタンスの中断リスクを最小化します。詳細は[AWS Batchのドキュメント](https://docs.aws.amazon.com/batch/latest/userguide/allocation-strategies.html)を参照してください。
-  - `computeEnvironmentInstanceTypes`: 使用するインスタンスタイプ。デフォルトでは["optimal"]に設定されていますが、特定のインスタンスタイプを指定することも可能です。例: ["c4.4xlarge", "m4.4xlarge", "c4.8xlarge"]
-  - `computeEnvironmentMinvCpus`: 最小vCPU数
-  - `computeEnvironmentMaxvCpus`: 最大vCPU数
-  - `computeEnvironmentDesiredvCpus`: 希望vCPU数
+#### コンピューティング環境
 
-- **ジョブ定義**:
-  - `jobDefinitionRetryAttempts`: ジョブ再試行回数
-  - `jobDefinitionVcpus`: ジョブあたりのvCPU数
-  - `jobDefinitionMemory`: ジョブあたりのメモリ（MB）
+| パラメータ名 | 説明 | 備考 |
+|------------|------|------|
+| `computeEnvironmentType` | コンピューティング環境タイプ | 'SPOT'または'EC2'を選択可能。コスト効率を重視する場合は'SPOT'を推奨 |
+| `computeEnvironmentAllocationStrategy` | 割り当て戦略 | デフォルトでは'SPOT_PRICE_CAPACITY_OPTIMIZED'に設定。[詳細](https://docs.aws.amazon.com/batch/latest/userguide/allocation-strategies.html) |
+| `computeEnvironmentInstanceTypes` | 使用するインスタンスタイプ | デフォルトでは["optimal"]。例: ["c4.4xlarge", "m4.4xlarge"] |
+| `computeEnvironmentMinvCpus` | 最小vCPU数 | - |
+| `computeEnvironmentMaxvCpus` | 最大vCPU数 | - |
+| `computeEnvironmentDesiredvCpus` | 希望vCPU数 | - |
+
+#### ジョブ定義
+
+| パラメータ名 | 説明 | 単位 |
+|------------|------|------|
+| `jobDefinitionRetryAttempts` | ジョブ再試行回数 | 回 |
+| `jobDefinitionVcpus` | ジョブあたりのvCPU数 | vCPU |
+| `jobDefinitionMemory` | ジョブあたりのメモリ | MB |
 
 その他変更できるパラメータの詳細はそれぞれのタイプにおけるドキュメントを参照してください：
 - [Lustre Task Export モード](docs/task_export_mode.md)
