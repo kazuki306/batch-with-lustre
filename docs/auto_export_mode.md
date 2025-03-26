@@ -55,7 +55,7 @@ Lambda関数が定期的にCloudWatchメトリクスをチェックし、エク�
 | envName | 環境名 | "AutoExport" |
 | ecrRepositoryName | ECRリポジトリ名 | "batch-job-with-lustre-auto-export" |
 | computeEnvironmentType | コンピューティング環境タイプ | "SPOT" |
-| computeEnvironmentAllocationStrategy | 割り当て戦略 | "BEST_FIT_PROGRESSIVE" |
+| computeEnvironmentAllocationStrategy | 割り当て戦略 | "SPOT_PRICE_CAPACITY_OPTIMIZED" |
 | computeEnvironmentInstanceTypes | インスタンスタイプ | ["optimal"] |
 | computeEnvironmentMinvCpus | 最小vCPU数 | 0 |
 | computeEnvironmentMaxvCpus | 最大vCPU数 | 256 |
