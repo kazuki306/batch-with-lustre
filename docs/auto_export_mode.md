@@ -1,6 +1,6 @@
-# Auto Export モード
+# Lustre Auto Export モード
 
-Auto Export モードは、AWS BatchとAmazon FSx for Lustreを組み合わせ、S3バケットとの自動同期機能を有効にしたデプロイオプションです。
+Lustre Auto Export モードは、AWS BatchとAmazon FSx for Lustreを組み合わせ、S3バケットとの自動同期機能を有効にしたデプロイオプションです。
 
 ## 概要
 
@@ -8,11 +8,11 @@ Auto Export モードは、AWS BatchとAmazon FSx for Lustreを組み合わせ�
 
 ## アーキテクチャ
 
-<img src="img/architecture/auto_export_archi.png" alt="Auto Export モードのアーキテクチャ" width="600" />
+<img src="img/architecture/auto_export_archi.png" alt="Lustre Auto Export モードのアーキテクチャ" width="600" />
 
-Auto Export モードでは、AWS BatchとFSx for Lustreを組み合わせ、S3バケットとの自動同期機能を活用したアーキテクチャを採用しています。このアーキテクチャでは、Lustreファイルシステム上での変更が自動的にS3バケットに反映され、データの一貫性が保たれます。Step Functionsがワークフローを調整し、CloudWatchメトリクスを監視してエクスポート完了後のリソースクリーンアップを自動化します。
+Lustre Auto Export モードでは、AWS BatchとFSx for Lustreを組み合わせ、S3バケットとの自動同期機能を活用したアーキテクチャを採用しています。このアーキテクチャでは、Lustreファイルシステム上での変更が自動的にS3バケットに反映され、データの一貫性が保たれます。Step Functionsがワークフローを調整し、CloudWatchメトリクスを監視してエクスポート完了後のリソースクリーンアップを自動化します。
 
-Auto Export モードでは以下のコンポーネントが連携します：
+Lustre Auto Export モードでは以下のコンポーネントが連携します：
 
 1. **Amazon FSx for Lustre**: 高性能な共有ファイルシステム
 2. **Amazon S3**: データの永続的な保存先
@@ -68,9 +68,9 @@ Lambda関数が定期的にCloudWatchメトリクスをチェックし、エク�
 
 ## Step Functions ワークフロー
 
-<img src="img/sfn_workflow/sfn_lustre_auto_export.png" alt="Auto Export モードのStep Functionsワークフロー" width="600" />
+<img src="img/sfn_workflow/sfn_lustre_auto_export.png" alt="Lustre Auto Export モードのStep Functionsワークフロー" width="600" />
 
-Auto Export モードのStep Functionsワークフローは以下のステップで構成されています：
+Lustre Auto Export モードのStep Functionsワークフローは以下のステップで構成されています：
 
 1. **Secrets Managerからパラメータ取得** (GetSecret → ExtractParameters)
    - 設定パラメータをSecrets Managerから取得し、後続のステップで使用
@@ -113,7 +113,7 @@ Auto Export モードのStep Functionsワークフローは以下のステップ
 
 ## ユースケース
 
-Auto Export モードは以下のようなシナリオに適しています：
+Lustre Auto Export モードは以下のようなシナリオに適しています：
 
 - **リアルタイムデータ処理**: 処理結果をS3に即時反映する必要がある場合
 - **継続的なデータ生成**: 継続的にデータが生成され、S3に保存する必要がある場合

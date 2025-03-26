@@ -1,6 +1,6 @@
-# Task Export モード
+# Lustre Task Export モード
 
-Task Export モードは、AWS BatchとAmazon FSx for Lustreを組み合わせ、明示的なデータリポジトリタスクを使用してS3バケットにデータをエクスポートするデプロイオプションです。
+Lustre Task Export モードは、AWS BatchとAmazon FSx for Lustreを組み合わせ、明示的なデータリポジトリタスクを使用してS3バケットにデータをエクスポートするデプロイオプションです。
 
 ## 概要
 
@@ -8,11 +8,11 @@ Task Export モードは、AWS BatchとAmazon FSx for Lustreを組み合わせ�
 
 ## アーキテクチャ
 
-<img src="img/architecture/task_export_archi.png" alt="Task Export モードのアーキテクチャ" width="600" />
+<img src="img/architecture/task_export_archi.png" alt="Lustre Task Export モードのアーキテクチャ" width="600" />
 
-Task Export モードでは、AWS BatchとFSx for Lustreを組み合わせ、明示的なデータリポジトリタスクを使用したアーキテクチャを採用しています。このアーキテクチャでは、S3からLustreへのデータインポートは自動的に行われますが、Lustreから S3へのエクスポートはジョブ完了後に明示的なタスクとして実行されます。これにより、ジョブ実行中のオーバーヘッドを抑えつつ、処理結果を確実にS3に保存することができます。
+Lustre Task Export モードでは、AWS BatchとFSx for Lustreを組み合わせ、明示的なデータリポジトリタスクを使用したアーキテクチャを採用しています。このアーキテクチャでは、S3からLustreへのデータインポートは自動的に行われますが、Lustreから S3へのエクスポートはジョブ完了後に明示的なタスクとして実行されます。これにより、ジョブ実行中のオーバーヘッドを抑えつつ、処理結果を確実にS3に保存することができます。
 
-Task Export モードでは以下のコンポーネントが連携します：
+Lustre Task Export モードでは以下のコンポーネントが連携します：
 
 1. **Amazon FSx for Lustre**: 高性能な共有ファイルシステム
 2. **Amazon S3**: データの永続的な保存先
@@ -24,7 +24,7 @@ Task Export モードでは以下のコンポーネントが連携します：
 
 ### 明示的なエクスポート機能
 
-Auto Exportモードとは異なり、Task Exportモードではファイルシステム上での変更は自動的にS3に反映されません。代わりに、ジョブ完了後に明示的なデータリポジトリタスクを実行してデータをエクスポートします：
+Lustre Auto Exportモードとは異なり、Lustre Task Exportモードではファイルシステム上での変更は自動的にS3に反映されません。代わりに、ジョブ完了後に明示的なデータリポジトリタスクを実行してデータをエクスポートします：
 
 - **EXPORT_TO_REPOSITORY**: 指定したパス（/scratch）のデータをS3バケットにエクスポート
 - エクスポートタスクの完了を待機してから、ファイルシステムを削除（オプション）
@@ -67,9 +67,9 @@ S3からLustreへの自動インポートは引き続き有効です：
 
 ## Step Functions ワークフロー
 
-<img src="img/sfn_workflow/sfn_lustre_task_export.png" alt="Task Export モードのStep Functionsワークフロー" width="600" />
+<img src="img/sfn_workflow/sfn_lustre_task_export.png" alt="Lustre Task Export モードのStep Functionsワークフロー" width="600" />
 
-Task Export モードのStep Functionsワークフローは以下のステップで構成されています：
+Lustre Task Export モードのStep Functionsワークフローは以下のステップで構成されています：
 
 1. **Secrets Managerからパラメータ取得** (GetSecret → ExtractParameters)
    - 設定パラメータをSecrets Managerから取得し、後続のステップで使用
@@ -113,11 +113,11 @@ Task Export モードのStep Functionsワークフローは以下のステップ
 12. **ファイルシステム削除（オプション）** (DeleteFSx)
     - deleteLustreフラグがtrueで、エクスポートタスクが完了した場合にファイルシステムを削除
 
-このワークフローの特徴は、Auto Exportモードとは異なり、ジョブ完了後に明示的なデータリポジトリタスクを作成してS3へのエクスポートを行う点です。これにより、ジョブ実行中はエクスポート処理によるオーバーヘッドを避けつつ、ジョブ完了後に確実にデータをS3に保存することができます。また、エクスポートタスクの完了を確認してからファイルシステムを削除するため、データ損失のリスクを最小限に抑えることができます。
+このワークフローの特徴は、Lustre Auto Exportモードとは異なり、ジョブ完了後に明示的なデータリポジトリタスクを作成してS3へのエクスポートを行う点です。これにより、ジョブ実行中はエクスポート処理によるオーバーヘッドを避けつつ、ジョブ完了後に確実にデータをS3に保存することができます。また、エクスポートタスクの完了を確認してからファイルシステムを削除するため、データ損失のリスクを最小限に抑えることができます。
 
-## Auto Export モードとの違い
+## Lustre Auto Export モードとの違い
 
-| 機能 | Task Export モード | Auto Export モード |
+| 機能 | Lustre Task Export モード | Lustre Auto Export モード |
 |------|-------------------|-------------------|
 | S3からのインポート | 自動 | 自動 |
 | S3へのエクスポート | 明示的なタスク実行 | 自動 |
@@ -126,7 +126,7 @@ Task Export モードのStep Functionsワークフローは以下のステップ
 
 ## ユースケース
 
-Task Export モードは以下のようなシナリオに適しています：
+Lustre Task Export モードは以下のようなシナリオに適しています：
 
 - **バッチ処理**: 処理完了後に一括でデータをエクスポートする場合
 - **大規模データセット**: 大量のデータを処理し、処理完了後にまとめてエクスポートする場合

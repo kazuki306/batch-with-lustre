@@ -1,4 +1,4 @@
-# Batch with Lustre/EBS
+# aws-cdk-batch-with-lustre
 
 このプロジェクトは、AWS BatchとAmazon FSx for LustreまたはAmazon EBSを組み合わせた高性能データ処理インフラストラクチャをAWS CDKを使用してデプロイするためのものです。SPOTインスタンスを活用してコスト効率良く大規模な計算処理を実行するためのフレームワークを提供します。
 
@@ -38,17 +38,16 @@ SPOTインスタンスを活用してコスト効率を最大化するために�
 
 このプロジェクトは、AWS BatchとAmazon FSx for Lustre/EBSを組み合わせた3つの異なるアーキテクチャモードを提供します。各モードは特定のユースケースに最適化されており、ワークロードの特性に応じて選択できます。
 
-### Lustre Auto Export モード
-Lustre Auto Export モードでは、Lustreファイルシステム上での変更が自動的にS3バケットに反映されます。バッチジョブ中のデータを同期的にS3にエクスポートしたい場合に最適です。。CloudWatchメトリクスを監視してエクスポート完了を確認し、すべてのデータがS3に同期された後にリソースをクリーンアップします。
-
-<img src="docs/img/architecture/auto_export_archi.png" alt="Auto Export モードのアーキテクチャ" width="500" />
-
-
 ### Lustre Task Export モード
 
 Lustre Task Export モードでは、ジョブ完了後に明示的な[データリポジトリタスク](https://docs.aws.amazon.com/fsx/latest/LustreGuide/data-repository-tasks.html)を実行してLustreからS3へのデータエクスポートを行います。バッチ処理や大規模データセットの処理に最適で、ジョブ実行中のエクスポートによるオーバーヘッドを避けることができます。
 
 <img src="docs/img/architecture/task_export_archi.png" alt="Task Export モードのアーキテクチャ" width="500" />
+
+### Lustre Auto Export モード
+Lustre Auto Export モードでは、Lustreファイルシステム上での変更が自動的にS3バケットに反映されます。バッチジョブ中のデータを同期的にS3にエクスポートしたい場合に最適です。。CloudWatchメトリクスを監視してエクスポート完了を確認し、すべてのデータがS3に同期された後にリソースをクリーンアップします。
+
+<img src="docs/img/architecture/auto_export_archi.png" alt="Auto Export モードのアーキテクチャ" width="500" />
 
 ### EBS モード
 
@@ -56,7 +55,7 @@ EBS モードでは、EBSボリュームを使用してシングルノードで�
 
 <img src="docs/img/architecture/only_ebs_archi.png" alt="Only EBS モードのアーキテクチャ" width="500" />
 
-### 共通コンポーネント
+<!-- ### 共通コンポーネント
 - **AWS Batch**: コンピューティングリソースの管理とジョブの実行
 - **AWS Step Functions**: ワークフローの調整と管理
 - **Amazon S3**: データの永続的な保存と共有
@@ -78,14 +77,14 @@ EBS モードでは、EBSボリュームを使用してシングルノードで�
    - 単一のEC2インスタンスにアタッチ
    - 高いIOPSとスループットを提供
    - コスト効率の良いストレージオプション
-   - S3との連携オプション
+   - S3との連携オプション -->
 
 ## デプロイモード
 
 このプロジェクトは3つのデプロイモードをサポートしています：
 
-1. **Lustre Auto Export**: FSx for Lustreを使用し、変更を自動的にS3にエクスポート ([詳細](docs/auto_export_mode.md))
-2. **Lustre Task Export**: FSx for Lustreを使用し、明示的なエクスポートタスクを実行 ([詳細](docs/task_export_mode.md))
+1. **Lustre Task Export**: FSx for Lustreを使用し、明示的なエクスポートタスクを実行 ([詳細](docs/task_export_mode.md))
+2. **Lustre Auto Export**: FSx for Lustreを使用し、変更を自動的にS3にエクスポート ([詳細](docs/auto_export_mode.md))
 3. **EBS**: EBSボリュームのみを使用 ([詳細](docs/only_ebs_mode.md))
 
 各モードの詳細な説明とパラメータについては、リンク先のドキュメントを参照してください。
@@ -119,17 +118,17 @@ npx cdk bootstrap
 
 デプロイモードを指定してCDKスタックをデプロイします：
 
-### FSx for Lustre (Auto Export)
-```
-npx cdk deploy -c type=autoExport
-```
-
-### FSx for Lustre (Task Export)
+### Lustre Task Export
 ```
 npx cdk deploy -c type=taskExport
 ```
 
-### EBSのみ
+### Lustre Auto Export
+```
+npx cdk deploy -c type=autoExport
+```
+
+### EBS
 ```
 npx cdk deploy -c type=onlyEBS
 ```
@@ -143,13 +142,13 @@ npx cdk deploy -c type=onlyEBS
 ./docker/push-image.sh <ECR のリポジトリ名>
 ```
 ECR のリポジトリは、それぞれのタイプに合わせて以下のリポジトリが作成されます：
-- task Export：batch-job-with-lustre-task-export
-- auto Export：batch-job-with-lustre-auto-export
+- Lustre Task Export：batch-job-with-lustre-task-export
+- Lustre Auto Export：batch-job-with-lustre-auto-export
 - EBS：batch-job-with-ebs
 
 2. StepFunction を実行します。使用するモードに合わせてそれぞれ以下の名前から始まる StepFunctionが作成されています：
-- task Export：CreateLustreTaskExportStateMachine*
-- auto Export：CreateLustreAutoExportStateMachine*
+- Lustre Task Export：CreateLustreTaskExportStateMachine*
+- Lustre Auto Export：CreateLustreAutoExportStateMachine*
 - EBS：BatchJobWithEbsStateMachine*
 
 入力は何も入れず、「Start Execution」ボタンを押すことで Step Function が実行されます。
@@ -185,8 +184,8 @@ ECR のリポジトリは、それぞれのタイプに合わせて以下のリ�
 ### AWS Batch 設定
 
 - **コンピューティング環境**:
-  - `computeEnvironmentType`: コンピューティング環境タイプ。'SPOT'または'EC2'を選択可能。
-  - `computeEnvironmentAllocationStrategy`: 割り当て戦略。デフォルトでは'SPOT_PRICE_CAPACITY_OPTIMIZED'に設定されています。詳細は[AWS Batchのドキュメント](https://docs.aws.amazon.com/batch/latest/userguide/allocation-strategies.html)を参照してください。
+  - `computeEnvironmentType`: コンピューティング環境タイプ。'SPOT'または'EC2'を選択可能。コスト効率を重視する場合は'SPOT'を推奨。
+  - `computeEnvironmentAllocationStrategy`: 割り当て戦略。デフォルトでは'SPOT_PRICE_CAPACITY_OPTIMIZED'に設定されており、SPOTインスタンスの中断リスクを最小化します。詳細は[AWS Batchのドキュメント](https://docs.aws.amazon.com/batch/latest/userguide/allocation-strategies.html)を参照してください。
   - `computeEnvironmentInstanceTypes`: 使用するインスタンスタイプ。デフォルトでは["optimal"]に設定されていますが、特定のインスタンスタイプを指定することも可能です。例: ["c4.4xlarge", "m4.4xlarge", "c4.8xlarge"]
   - `computeEnvironmentMinvCpus`: 最小vCPU数
   - `computeEnvironmentMaxvCpus`: 最大vCPU数

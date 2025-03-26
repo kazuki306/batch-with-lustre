@@ -1,6 +1,6 @@
-# Only EBS モード
+# EBS モード
 
-Only EBS モードは、AWS BatchとAmazon EBS（Elastic Block Store）を組み合わせたデプロイオプションで、FSx for Lustreを使用せずにシンプルなブロックストレージを提供します。
+EBS モードは、AWS BatchとAmazon EBS（Elastic Block Store）を組み合わせたデプロイオプションで、FSx for Lustreを使用せずにシンプルなブロックストレージを提供します。
 
 ## 概要
 
@@ -8,11 +8,11 @@ Only EBS モードは、AWS BatchとAmazon EBS（Elastic Block Store）を組み
 
 ## アーキテクチャ
 
-<img src="img/architecture/only_ebs_archi.png" alt="Only EBS モードのアーキテクチャ" width="600" />
+<img src="img/architecture/only_ebs_archi.png" alt="EBS モードのアーキテクチャ" width="600" />
 
-Only EBS モードでは、AWS BatchとAmazon EBSを組み合わせたシンプルで効率的なアーキテクチャを採用しています。このアーキテクチャでは、高性能なEBSボリュームがBatchジョブを実行するEC2インスタンスに直接アタッチされ、単一インスタンスでの高速なデータ処理を実現します。Step Functionsがボリュームのライフサイクル管理を自動化し、ジョブ完了後のリソースクリーンアップを行います。
+EBS モードでは、AWS BatchとAmazon EBSを組み合わせたシンプルで効率的なアーキテクチャを採用しています。このアーキテクチャでは、高性能なEBSボリュームがBatchジョブを実行するEC2インスタンスに直接アタッチされ、単一インスタンスでの高速なデータ処理を実現します。Step Functionsがボリュームのライフサイクル管理を自動化し、ジョブ完了後のリソースクリーンアップを行います。
 
-Only EBS モードでは以下のコンポーネントが連携します：
+EBS モードでは以下のコンポーネントが連携します：
 
 1. **Amazon EBS**: 高性能なブロックストレージ
 2. **Amazon S3**: データの永続的な保存先（オプション）
@@ -23,7 +23,7 @@ Only EBS モードでは以下のコンポーネントが連携します：
 
 ### EBSボリュームの管理
 
-Only EBSモードでは、Step Functionsワークフローが以下のEBS関連タスクを実行します：
+EBSモードでは、Step Functionsワークフローが以下のEBS関連タスクを実行します：
 
 - **ボリューム作成**: 指定されたサイズ、IOPS、スループットでgp3ボリュームを作成
 - **ボリュームアタッチ**: EC2インスタンス起動時にユーザーデータスクリプトを使用してボリュームをアタッチ
@@ -64,9 +64,9 @@ Only EBSモードでは、Step Functionsワークフローが以下のEBS関連�
 
 ## Step Functions ワークフロー
 
-<img src="img/sfn_workflow/sfn_ebs.png" alt="Only EBS モードのStep Functionsワークフロー" width="600" />
+<img src="img/sfn_workflow/sfn_ebs.png" alt="EBS モードのStep Functionsワークフロー" width="600" />
 
-Only EBS モードのStep Functionsワークフローは以下のステップで構成されています：
+EBS モードのStep Functionsワークフローは以下のステップで構成されています：
 
 1. **Secrets Managerからパラメータ取得** (GetSecret → ExtractParameters)
    - 設定パラメータをSecrets Managerから取得し、後続のステップで使用
@@ -110,7 +110,7 @@ Only EBS モードのStep Functionsワークフローは以下のステップで
 
 ## Lustre モードとの違い
 
-| 機能 | Only EBS モード | Lustre モード |
+| 機能 | EBS モード | Lustre モード |
 |------|----------------|--------------|
 | ストレージタイプ | ブロックストレージ | 共有ファイルシステム |
 | 複数インスタンスからのアクセス | 不可 | 可能 |
@@ -121,7 +121,7 @@ Only EBS モードのStep Functionsワークフローは以下のステップで
 
 ## テストスクリプト
 
-Only EBS モードには、EBSボリュームのパフォーマンスをテストするための複数のスクリプトが含まれています：
+EBS モードには、EBSボリュームのパフォーマンスをテストするための複数のスクリプトが含まれています：
 
 ### write_delete_test_ebs_v2.sh
 
@@ -150,7 +150,7 @@ EBSとS3の同期テスト：
 
 ## ユースケース
 
-Only EBS モードは以下のようなシナリオに適しています：
+EBS モードは以下のようなシナリオに適しています：
 
 - **単一インスタンス処理**: 共有ファイルシステムが不要な場合
 - **コスト最適化**: FSx for Lustreよりも低コストでストレージが必要な場合
