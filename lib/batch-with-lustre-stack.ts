@@ -269,7 +269,10 @@ export class BatchWithLustreStack extends cdk.Stack {
                 'iam:AttachRolePolicy',
                 'iam:PutRolePolicy'
               ],
-              resources: ['arn:aws:iam::*:role/aws-service-role/s3.data-source.lustre.fsx.amazonaws.com/*']
+              resources: [
+                'arn:aws:iam::*:role/aws-service-role/s3.data-source.lustre.fsx.amazonaws.com/*',
+                'arn:aws:iam::*:role/aws-service-role/fsx.amazonaws.com/*'
+              ]
             }),
             // S3アクセスの権限
             new iam.PolicyStatement({

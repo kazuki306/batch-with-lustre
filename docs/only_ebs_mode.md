@@ -76,7 +76,7 @@ EBSモードでは、Step Functionsワークフローが以下のEBS関連タス
 | jobDefinitionMemory | ジョブあたりのメモリ（MB） | 30000 |
 | waitForEbsCreationSeconds | EBS作成待機時間（秒） | 30 |
 | waitForJobCompletionSeconds | ジョブ完了待機時間（秒） | 300 |
-| waitAfterDetachSeconds | デタッチ後の待機時間（秒） | 10 |
+| waitAfterDetachSeconds | EBSボリュームデタッチ後の待機時間（秒） | 10 |
 
 ## Step Functions ワークフロー
 
@@ -118,8 +118,12 @@ EBS モードのStep Functionsワークフローは以下のステップで構�
    - deleteEbsフラグがtrueの場合、ボリュームをインスタンスからデタッチ
    - エラーが発生しても処理を継続（addCatch設定）
 
-10. **EBSボリューム削除（deleteEbs=trueの場合）** (WaitAfterDetach → DeleteEbsVolume)
-    - デタッチ後に短時間待機してからボリュームを削除
+10. **ボリューム状態確認** (CheckVolumeStatus → IsVolumeDetached)
+    - デタッチ後にボリュームの状態を確認
+    - ボリュームがデタッチされていない場合は待機してから再確認
+
+11. **EBSボリューム削除（deleteEbs=trueの場合）** (DeleteEbsVolume)
+    - ボリュームがデタッチされたことを確認してから削除
     - deleteEbsフラグがfalseの場合はこのステップをスキップし、ボリュームを保持
 
 <!-- このワークフローの特徴は、Lustreモードと比較してシンプルな構造であることです。単一のEBSボリュームを作成し、Batchジョブで使用した後、オプションでクリーンアップするという直接的なフローになっています。また、ボリュームが使用中の場合（他のインスタンスにアタッチされている場合）は、ユーザーデータスクリプトによってインスタンスを自動的に終了させる安全機構が組み込まれています。 -->

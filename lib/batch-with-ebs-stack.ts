@@ -495,6 +495,17 @@ export class BatchWithEbsStack extends cdk.Stack {
       time: sfn.WaitTime.secondsPath('$.credentials.SecretsManagerParameters.waitAfterDetachSeconds')
     });
 
+    // Check volume status after detach
+    const checkVolumeStatus = new tasks.CallAwsService(this, 'CheckVolumeStatus', {
+      service: 'ec2',
+      action: 'describeVolumes',
+      parameters: {
+        'VolumeIds.$': "States.Array($.volume.VolumeId)"
+      },
+      iamResources: ['*'],
+      resultPath: '$.volumeStatusAfterDetach'
+    });
+
     // Delete EBS volume task
     const deleteEbsVolume = new tasks.CallAwsService(this, 'DeleteEbsVolume', {
       service: 'ec2',
@@ -507,18 +518,24 @@ export class BatchWithEbsStack extends cdk.Stack {
     });
 
     // エラーハンドリングの設定: detachEbsVolumeでエラーが発生しても処理を続行
-    detachEbsVolume.addCatch(waitAfterDetach, {
+    detachEbsVolume.addCatch(checkVolumeStatus, {
       errors: ['States.ALL'],
       resultPath: '$.detachVolumeError'
     });
 
+    // Check if volume is detached
+    const isVolumeDetached = new sfn.Choice(this, 'IsVolumeDetached')
+      .when(sfn.Condition.stringEquals('$.volumeStatusAfterDetach.Volumes[0].State', 'available'),
+        deleteEbsVolume.next(jobSucceeded))
+      .otherwise(waitAfterDetach.next(checkVolumeStatus));
+
+    // Connect check volume status to the choice state
+    checkVolumeStatus.next(isVolumeDetached);
+
     // Check if EBS should be deleted
     const shouldDeleteEbs = new sfn.Choice(this, 'ShouldDeleteEbs')
       .when(sfn.Condition.stringEquals('$.credentials.SecretsManagerParameters.deleteEbs', 'true'),
-        detachEbsVolume
-          .next(waitAfterDetach)
-          .next(deleteEbsVolume)
-          .next(jobSucceeded))
+        detachEbsVolume.next(checkVolumeStatus))
       .otherwise(jobSucceeded);
 
     // Check EBS volume availability

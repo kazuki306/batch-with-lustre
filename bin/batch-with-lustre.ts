@@ -24,12 +24,13 @@ const app = new cdk.App();
 // };
 
 // cdk.jsonから環境タイプのパラメータを取得
-const type = app.node.tryGetContext('type');
+const type = app.node.tryGetContext('type') || 'taskExport';
 const context = app.node.tryGetContext(type);
 
-if (!context) {
-  throw new Error(`Invalid type: ${type}. Please specify a valid type using -c type=<autoExport|taskExport|onlyEBS>`);
-}
+// contextの存在チェック
+// if (!context) {
+//   throw new Error(`Invalid type: ${type}. Please specify a valid type using -c type=<autoExport|taskExport|onlyEBS>`);
+// }
 
 // 環境タイプに応じたスタックを作成
 if (type === 'autoExport' || type === 'taskExport') {
@@ -49,6 +50,9 @@ if (type === 'autoExport' || type === 'taskExport') {
     // ...commonProps,
     ...context
   });
+} else {
+  // 無効なtypeの場合はエラーを投げる
+  throw new Error(`Invalid type: ${type}. Please specify a valid type using -c type=<autoExport|taskExport|onlyEBS>`);
 }
 
 app.synth();
