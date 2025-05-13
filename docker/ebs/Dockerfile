@@ -42,4 +42,4 @@ COPY ebs/write_delete_test_ebs_with_s3.sh .
 RUN chmod +x write_delete_test_ebs_with_s3.sh
 
 # Set default command (デフォルトで5回の書き込み、20GBのファイルサイズ、/data ディレクトリ)
-CMD ["./write_delete_test_ebs_with_s3.sh", "10", "100", "/data"]
+CMD ["./write_delete_test_ebs_with_s3.sh", "5", "20", "/data"]
